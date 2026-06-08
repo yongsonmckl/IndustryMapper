@@ -3,7 +3,7 @@ name: ingest-sources
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 */12 * * *"
+    - cron: "0 */6 * * *"
 
 jobs:
   ingest:
@@ -26,6 +26,14 @@ jobs:
           SUPABASE_API_KEY: sb_publishable_V0f2QVxSxgU9ZGb5W5xBcg_bd0VSKEK
           SUPABASE_INGEST_TOKEN: ${{ secrets.SUPABASE_INGEST_TOKEN }}
         run: python ingestion/ingest_sources.py
+
+      - name: Run retention cleanup
+        env:
+          SUPABASE_URL: https://uwfpjwlkypryqhfmbybj.supabase.co
+          SUPABASE_API_KEY: sb_publishable_V0f2QVxSxgU9ZGb5W5xBcg_bd0VSKEK
+          SUPABASE_INGEST_TOKEN: ${{ secrets.SUPABASE_INGEST_TOKEN }}
+          ARTICLE_RETENTION_DAYS: "14"
+        run: python ingestion/cleanup_supabase.py
 
       - name: Upload ingestion artifact
         uses: actions/upload-artifact@v4
