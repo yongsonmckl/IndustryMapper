@@ -2,11 +2,11 @@
 
 Last updated: 2026-06-08
 
-This file captures the current planning-phase research that locks the first POC scope, subsector taxonomy, severity scale, and initial source shortlist.
+This file captures the current planning and implementation-phase research that locks the first POC scope, subsector taxonomy, severity scale, source shortlist, and current infrastructure decisions.
 
 ## Phase Scope Lock
 
-The first POC industry scope is now locked to:
+The first POC industry scope is locked to:
 
 1. `Semiconductors`
 2. `Oil & Gas`
@@ -27,28 +27,20 @@ Primary references:
 Recommended semiconductor subsectors for the POC:
 
 1. `EDA and Semiconductor IP`
-   - Design software, verification, reusable IP blocks, design enablement.
 2. `Fabless Chip Design`
-   - Companies designing chips without owning significant wafer fabrication capacity.
 3. `Foundry and Wafer Fabrication`
-   - Contract manufacturing fabs and wafer-processing operations.
 4. `Integrated Device Manufacturers`
-   - Vertically integrated chip companies that design and manufacture.
 5. `Semiconductor Equipment`
-   - Lithography, deposition, etch, metrology, packaging, test, and fab tools.
 6. `Materials and Wafers`
-   - Silicon wafers, specialty gases, chemicals, substrates, photoresists, rare process materials.
 7. `Assembly, Packaging, and Test`
-   - OSAT and ATP providers, advanced packaging, backend test.
 8. `Memory Devices`
-   - DRAM, NAND, HBM, and memory-specific supply chain developments.
 
 Why this structure:
 
-- It maps directly to where disruptions actually happen.
-- It aligns with company archetypes users already recognize.
-- It is better for event extraction than product-only categories.
-- It scales later into product-market overlays like `AI accelerators`, `automotive semis`, or `power semis` without redesigning the core taxonomy.
+- it maps directly to where disruptions actually happen
+- it aligns with company archetypes users already recognize
+- it is better for event extraction than product-only categories
+- it scales later into product overlays without redesigning the core taxonomy
 
 ### Oil & Gas
 
@@ -58,34 +50,27 @@ Primary references:
 
 - EPA oil and gas sector overview: <https://www.epa.gov/smartsectors/oil-and-gas-sector-information>
 - GPA Midstream explainer: <http://www.gpamidstream.org/about/what-is-midstream/>
-- BOEM oil and gas program page: <https://www.boem.gov/>
+- BOEM program site: <https://www.boem.gov/>
 
 Recommended oil and gas subsectors for the POC:
 
 1. `Upstream Exploration and Production`
-   - Exploration, licensing, drilling, field development, production, offshore and onshore output.
 2. `Oilfield Services and Drilling`
-   - Rigs, well services, completion, subsea service providers, field services.
 3. `Midstream Transportation and Storage`
-   - Pipelines, gathering, terminals, storage, tankers, rail movement.
 4. `Gas Processing and LNG`
-   - Gas treatment, liquefaction, LNG export/import terminals, regasification.
 5. `Refining`
-   - Crude processing into fuels and refined products.
 6. `Petrochemicals and NGLs`
-   - NGL fractionation, petrochemical feedstocks, chemicals exposure tied to hydrocarbons.
 7. `Fuel Marketing and Distribution`
-   - Wholesale and retail distribution of refined products and gas to end markets.
 
 Why this structure:
 
-- It matches the industry value chain used in public reporting.
-- It creates obvious event geography: wells, ports, pipelines, refineries, LNG terminals.
-- It separates physical disruptions from policy and market effects cleanly.
+- it matches the value chain used in public reporting
+- it creates obvious event geography
+- it separates physical disruptions from policy and market effects cleanly
 
 ## Severity Framework Research
 
-The original `1-5` severity idea is workable, but your requested `0-5` scale is better because it preserves neutral but relevant news without forcing artificial risk inflation.
+Your requested `0-5` severity model remains the correct choice for the POC because it preserves relevant neutral news without forcing artificial risk inflation.
 
 Locked severity model:
 
@@ -100,101 +85,117 @@ Locked severity model:
 
 UI note:
 
-- The map icon and surrounding ring should derive directly from this severity value.
-- `0` should still render on the map, but visually read as informative rather than urgent.
+- the map icon and surrounding ring should derive directly from this severity value
+- `0` should still render on the map, but read as informative rather than urgent
 
 ## Source Research
 
 Selection rules used:
 
-- Publicly viewable without paid subscription requirement.
-- Reputable trade, association, or government source.
-- Useful for RSS-first or simple structured ingestion.
-- Strong enough editorial or institutional credibility to support a curated POC.
+- publicly viewable without paid subscription requirement
+- reputable trade, association, or government source
+- useful for RSS-first or simple structured ingestion
+- strong enough editorial or institutional credibility to support a curated POC
 
-### Semiconductor sources
+### Current registry status
+
+Not every researched source is active in the current ingestion workflow.
+
+Current actively enabled feeds are:
+
+- `EE Times`
+- `Electronics Weekly`
+- `Semiconductor Today`
+- `U.S. Energy Information Administration`
+- `Rigzone`
+
+Other researched sources remain part of the registry but may be disabled pending better feed or parser support.
+
+### Researched semiconductor sources
 
 1. `Semiconductor Industry Association (SIA)`
-   - Type: association
-   - URL: <https://www.semiconductors.org/>
-   - Why: policy, ecosystem, industry-wide announcements and public reports.
 2. `SEMI Newsroom`
-   - Type: association / industry body
-   - URL: <https://www.semi.org/en/news-media-press/newsroom>
-   - Why: semiconductor manufacturing, supply chain, equipment, standards, and industry program news.
 3. `Semiconductor Engineering`
-   - Type: trade media
-   - URL: <https://semiengineering.com/>
-   - Why: deep coverage of design, manufacturing, packaging, materials, and supply chain issues.
 4. `EE Times`
-   - Type: trade media
-   - URL: <https://www.eetimes.com/feed-reader/>
-   - Why: established electronics and chip industry reporting with feed access.
 5. `Electronics Weekly`
-   - Type: trade media
-   - URL: <https://www.electronicsweekly.com/rss-feeds/>
-   - Why: long-running electronics trade publication with free RSS access and regular semiconductor coverage.
 6. `Semiconductor Today`
-   - Type: trade media
-   - URL: <https://www.semiconductor-today.com/rss.shtml>
-   - Why: explicitly free RSS feeds and broad semiconductor manufacturing news.
 7. `Bureau of Industry and Security (BIS)`
-   - Type: government / official notices
-   - URL: <https://media.bis.gov/news-updates>
-   - Why: export controls, semiconductor equipment restrictions, entity actions, compliance-critical policy moves.
 
-### Oil & gas sources
+### Researched oil & gas sources
 
 8. `U.S. Energy Information Administration (EIA)`
-   - Type: government / data and analysis
-   - URL: <https://www.eia.gov/tools/rssfeeds/>
-   - Why: free RSS, timely energy updates, official statistical context.
 9. `U.S. Department of Energy - Oil & Natural Gas News`
-   - Type: government
-   - URL: <https://www.energy.gov/hgeo/fossil-energy-rss-feeds>
-   - Why: official energy policy and program updates with free RSS feeds.
 10. `Bureau of Ocean Energy Management (BOEM)`
-    - Type: government / official notices
-    - URL: <https://www.boem.gov/>
-    - Why: offshore leasing, rulemaking, environmental review, and federal offshore oil and gas program updates.
 11. `Rigzone`
-    - Type: trade media
-    - URL: <https://www.rigzone.com/news/rss.asp>
-    - Why: structured RSS across exploration, production, and operations.
 12. `World Oil`
-    - Type: trade media
-    - URL: <https://www.worldoil.com/news>
-    - Why: trusted upstream-focused reporting across exploration, drilling, production, LNG, and regulation.
 13. `Offshore Technology`
-    - Type: trade media
-    - URL: <https://www.offshore-technology.com/>
-    - Why: offshore projects, operators, subsea, and technology developments.
 14. `Energy Voice`
-    - Type: trade media
-    - URL: <https://www.energyvoice.com/category/oilandgas/>
-    - Why: ongoing coverage of company moves, North Sea, LNG, and broader oil and gas developments.
 
-## Ingestion Implications
+## Ingestion Research Updates
 
-The source list supports a practical Phase 2 ingestion shape:
+The current implementation established several practical conclusions:
 
-1. Prefer RSS or feed-like pages first.
-2. Normalize every fetched article into a common article record before any AI extraction.
-3. Store source metadata and raw payloads for traceability.
-4. Keep the first run read-only capable so GitHub Actions can validate ingestion even before DB credentials are added.
+### 1. RSS-first remains correct
+
+The sources that worked most reliably for fast implementation were the ones with stable feeds.
+
+### 2. Pre-insert dedupe is necessary
+
+Syndicated or near-identical stories can waste database space quickly on a small free-tier project.
+
+Current dedupe strategy now implemented in ingestion:
+
+- normalize URLs
+- strip common tracking parameters
+- build uniqueness around canonical URL
+- fall back to normalized title plus publish day when needed
+- pick a single winner based on source reliability, summary richness, and timestamp presence
+- skip hashes already stored in Supabase
+
+### 3. Retention is necessary on the free plan
+
+Database storage is limited enough that retention should not be treated as optional.
+
+Current implemented rule:
+
+- keep recent articles only
+- current retention period: `14` days
+- preserve articles already linked to `event_articles`
+
+### 4. A clean reset was the right short-term move
+
+Because only early ingest data existed and no event layer depended on it yet, resetting runtime data was simpler than trying to repair historical duplicates in place.
+
+## Infrastructure Research Updates
+
+### Supabase project decision
+
+The project is correctly using a single Supabase project for multiple industries.
+
+Why this is still the right decision:
+
+- easier cross-industry querying
+- one schema and one ingest pipeline
+- less duplicated operational overhead
+- free-plan project count is limited
+
+### GitHub Actions decision
+
+GitHub Actions remains suitable for the POC because:
+
+- jobs are visible
+- jobs are rerunnable
+- schedule is good enough for current source volume
+- it avoids introducing extra paid infrastructure
 
 ## Schema Direction Changes From Earlier Planning
 
-One design change is worth locking immediately:
+These design changes are now locked:
 
-- `events` should not point to a single `source_article_id`.
-- Use an `event_articles` join table instead.
-
-Reason:
-
-- One article can produce multiple events.
-- Multiple articles can later support the same event.
-- The join table preserves source traceability without forcing a redesign in Phase 3 or Phase 4.
+1. `events` should not point to a single `source_article_id`
+   - use `event_articles` instead
+2. dedupe must happen before insert, not only after storage growth becomes visible
+3. article retention must be automated as part of the ingest workflow
 
 ## Current Decision Summary
 
@@ -207,3 +208,6 @@ Locked for the first POC:
 5. Severity scale: `0-5`
 6. Severity colors: `Green`, `Yellow`, `Orange`, `Red`, `Dark Purple`, `Black`
 7. Source strategy: curated public sources with RSS-first ingestion
+8. Database strategy: one Supabase project for many industries
+9. Retention strategy: automated `14` day article retention
+10. Dedupe strategy: pre-insert canonical article selection
