@@ -106,11 +106,3 @@ The repository currently includes:
 4. Implement AI enrichment for event extraction and classification
 5. Build the map-first frontend shell
 6. Connect frontend filters to geospatial event queries
-
-## Notes
-
-The planning and research materials for the current phase are stored in:
-
-- [.harness/PLAN.md](C:\Users\Wong\CodexProjects\IndustryMapper\.harness\PLAN.md)
-- [.harness/AGENTS.md](C:\Users\Wong\CodexProjects\IndustryMapper\.harness\AGENTS.md)
-- [.harness/RESEARCH.md](C:\Users\Wong\CodexProjects\IndustryMapper\.harness\RESEARCH.md)
