@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -30,6 +30,9 @@ class SourceRecord:
     base_domain: str
     reliability_tier: int
     notes: str
+    enabled: bool = False
+    max_entries: int = 25
+    lookback_days: int = 30
 
 
 def utc_now_iso() -> str:
@@ -52,17 +55,31 @@ def build_article_hash(source_slug: str, url: str, published_at: str | None, tit
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
+def parse_entry_timestamp(entry: Any) -> str | None:
+    if entry.get("published_parsed"):
+        return datetime(*entry.published_parsed[:6], tzinfo=timezone.utc).isoformat()
+    if entry.get("updated_parsed"):
+        return datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc).isoformat()
+    return None
+
+
+def is_recent_enough(source: SourceRecord, published_at: str | None) -> bool:
+    if published_at is None:
+        return True
+    published = datetime.fromisoformat(published_at)
+    cutoff = datetime.now(timezone.utc) - timedelta(days=source.lookback_days)
+    return published >= cutoff
+
+
 def parse_entry(source: SourceRecord, entry: Any) -> dict[str, Any] | None:
     url = normalize_link(entry.get("link"))
     title = (entry.get("title") or "").strip()
     if not url or not title:
         return None
 
-    published_at = None
-    if entry.get("published_parsed"):
-        published_at = datetime(*entry.published_parsed[:6], tzinfo=timezone.utc).isoformat()
-    elif entry.get("updated_parsed"):
-        published_at = datetime(*entry.updated_parsed[:6], tzinfo=timezone.utc).isoformat()
+    published_at = parse_entry_timestamp(entry)
+    if not is_recent_enough(source, published_at):
+        return None
 
     summary = (entry.get("summary") or entry.get("description") or "").strip()
     article_hash = build_article_hash(source.slug, url, published_at, title)
@@ -92,6 +109,15 @@ def parse_entry(source: SourceRecord, entry: Any) -> dict[str, Any] | None:
 
 
 def fetch_feed(source: SourceRecord) -> dict[str, Any]:
+    if not source.enabled:
+        return {
+            "source_slug": source.slug,
+            "fetched_at": utc_now_iso(),
+            "status": "skipped",
+            "reason": "disabled",
+            "articles": [],
+        }
+
     if not source.feed_url:
         return {
             "source_slug": source.slug,
@@ -115,6 +141,8 @@ def fetch_feed(source: SourceRecord) -> dict[str, Any]:
             normalized = parse_entry(source, entry)
             if normalized:
                 articles.append(normalized)
+            if len(articles) >= source.max_entries:
+                break
 
         return {
             "source_slug": source.slug,
@@ -143,44 +171,32 @@ def write_artifact(name: str, payload: dict[str, Any]) -> Path:
 
 def upsert_to_supabase(source_results: list[dict[str, Any]]) -> None:
     supabase_url = os.getenv("SUPABASE_URL")
-    service_role_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY")
-    if not supabase_url or not service_role_key:
-        print("SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY not set; skipping database write.")
+    api_key = os.getenv("SUPABASE_API_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    ingest_token = os.getenv("SUPABASE_INGEST_TOKEN")
+    if not supabase_url or not api_key:
+        print("SUPABASE_URL or SUPABASE_API_KEY not set; skipping database write.")
         return
 
     headers = {
-        "apikey": service_role_key,
-        "Authorization": f"Bearer {service_role_key}",
+        "apikey": api_key,
+        "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates",
     }
+    if ingest_token:
+        headers["x-ingest-token"] = ingest_token
 
     sources = load_sources()
-    source_id_map = {}
-
-    for source in sources:
-        payload = {
-            "slug": source.slug,
-            "name": source.name,
-            "source_type": source.source_type,
-            "access_model": source.access_model,
-            "homepage_url": source.homepage_url,
-            "feed_url": source.feed_url,
-            "base_domain": source.base_domain,
-            "reliability_tier": source.reliability_tier,
-            "notes": source.notes,
-        }
-        response = requests.post(
-            f"{supabase_url}/rest/v1/sources",
-            headers={**headers, "Prefer": "resolution=merge-duplicates,return=representation"},
-            params={"on_conflict": "slug"},
-            json=payload,
-            timeout=TIMEOUT_SECONDS,
-        )
-        response.raise_for_status()
-        body = response.json()
-        if body:
-            source_id_map[source.slug] = body[0]["id"]
+    tracked_slugs = [source.slug for source in sources]
+    slug_filter = ",".join(tracked_slugs)
+    response = requests.get(
+        f"{supabase_url}/rest/v1/sources",
+        headers=headers,
+        params={"select": "id,slug", "slug": f"in.({slug_filter})"},
+        timeout=TIMEOUT_SECONDS,
+    )
+    response.raise_for_status()
+    source_id_map = {row["slug"]: row["id"] for row in response.json()}
 
     for result in source_results:
         articles = result.get("articles", [])
@@ -219,10 +235,17 @@ def upsert_to_supabase(source_results: list[dict[str, Any]]) -> None:
 def main() -> None:
     sources = load_sources()
     source_results = [fetch_feed(source) for source in sources]
+    summary = {
+        "ok": sum(1 for result in source_results if result["status"] == "ok"),
+        "skipped": sum(1 for result in source_results if result["status"] == "skipped"),
+        "error": sum(1 for result in source_results if result["status"] == "error"),
+        "article_count": sum(result.get("article_count", 0) for result in source_results),
+    }
 
     snapshot = {
         "generated_at": utc_now_iso(),
         "source_count": len(source_results),
+        "summary": summary,
         "results": source_results,
     }
     artifact_path = write_artifact("latest_ingestion_snapshot.json", snapshot)

@@ -7,6 +7,9 @@
     "access_model": "free",
     "homepage_url": "https://www.semiconductors.org/",
     "feed_url": null,
+    "enabled": false,
+    "max_entries": 0,
+    "lookback_days": 30,
     "base_domain": "semiconductors.org",
     "reliability_tier": 5,
     "notes": "Industry association source for policy, ecosystem, and market framing."
@@ -19,6 +22,9 @@
     "access_model": "free",
     "homepage_url": "https://www.semi.org/en/news-media-press/newsroom",
     "feed_url": null,
+    "enabled": false,
+    "max_entries": 0,
+    "lookback_days": 30,
     "base_domain": "semi.org",
     "reliability_tier": 5,
     "notes": "Manufacturing, equipment, materials, and supply chain news from SEMI."
@@ -31,6 +37,9 @@
     "access_model": "free",
     "homepage_url": "https://semiengineering.com/",
     "feed_url": null,
+    "enabled": false,
+    "max_entries": 0,
+    "lookback_days": 30,
     "base_domain": "semiengineering.com",
     "reliability_tier": 4,
     "notes": "Deep technical and supply-chain reporting."
@@ -43,6 +52,9 @@
     "access_model": "free",
     "homepage_url": "https://www.eetimes.com/feed-reader/",
     "feed_url": "https://www.eetimes.com/feed/",
+    "enabled": true,
+    "max_entries": 25,
+    "lookback_days": 30,
     "base_domain": "eetimes.com",
     "reliability_tier": 4,
     "notes": "Established electronics and semiconductor publication."
@@ -55,6 +67,9 @@
     "access_model": "free",
     "homepage_url": "https://www.electronicsweekly.com/rss-feeds/",
     "feed_url": "https://www.electronicsweekly.com/feed/",
+    "enabled": true,
+    "max_entries": 25,
+    "lookback_days": 30,
     "base_domain": "electronicsweekly.com",
     "reliability_tier": 4,
     "notes": "Long-running electronics industry publication with free RSS."
@@ -67,6 +82,9 @@
     "access_model": "free",
     "homepage_url": "https://www.semiconductor-today.com/rss.shtml",
     "feed_url": "https://www.semiconductor-today.com/rss/news.xml",
+    "enabled": true,
+    "max_entries": 40,
+    "lookback_days": 14,
     "base_domain": "semiconductor-today.com",
     "reliability_tier": 4,
     "notes": "Publicly available semiconductor RSS feed source."
@@ -79,6 +97,9 @@
     "access_model": "free",
     "homepage_url": "https://media.bis.gov/news-updates",
     "feed_url": null,
+    "enabled": false,
+    "max_entries": 0,
+    "lookback_days": 30,
     "base_domain": "bis.gov",
     "reliability_tier": 5,
     "notes": "Official export-control and semiconductor policy updates."
@@ -91,6 +112,9 @@
     "access_model": "free",
     "homepage_url": "https://www.eia.gov/tools/rssfeeds/",
     "feed_url": "https://www.eia.gov/rss/todayinenergy.xml",
+    "enabled": true,
+    "max_entries": 25,
+    "lookback_days": 30,
     "base_domain": "eia.gov",
     "reliability_tier": 5,
     "notes": "Official energy analysis and data source."
@@ -103,6 +127,9 @@
     "access_model": "free",
     "homepage_url": "https://www.energy.gov/hgeo/fossil-energy-rss-feeds",
     "feed_url": null,
+    "enabled": false,
+    "max_entries": 0,
+    "lookback_days": 30,
     "base_domain": "energy.gov",
     "reliability_tier": 5,
     "notes": "Official DOE office updates relevant to oil and gas."
@@ -115,6 +142,9 @@
     "access_model": "free",
     "homepage_url": "https://www.boem.gov/",
     "feed_url": null,
+    "enabled": false,
+    "max_entries": 0,
+    "lookback_days": 30,
     "base_domain": "boem.gov",
     "reliability_tier": 5,
     "notes": "Official offshore oil and gas leasing and regulatory source."
@@ -127,6 +157,9 @@
     "access_model": "free",
     "homepage_url": "https://www.rigzone.com/news/rss.asp",
     "feed_url": "https://www.rigzone.com/news/rss/rigzone_latest.aspx",
+    "enabled": true,
+    "max_entries": 25,
+    "lookback_days": 30,
     "base_domain": "rigzone.com",
     "reliability_tier": 4,
     "notes": "Operational oil and gas news with category RSS feeds."
@@ -139,6 +172,9 @@
     "access_model": "free",
     "homepage_url": "https://www.worldoil.com/news",
     "feed_url": null,
+    "enabled": false,
+    "max_entries": 0,
+    "lookback_days": 30,
     "base_domain": "worldoil.com",
     "reliability_tier": 4,
     "notes": "Trusted upstream oil and gas publication."
@@ -151,6 +187,9 @@
     "access_model": "free",
     "homepage_url": "https://www.offshore-technology.com/",
     "feed_url": null,
+    "enabled": false,
+    "max_entries": 0,
+    "lookback_days": 30,
     "base_domain": "offshore-technology.com",
     "reliability_tier": 4,
     "notes": "Offshore oil and gas projects, technology, and market analysis."
@@ -163,6 +202,9 @@
     "access_model": "free",
     "homepage_url": "https://www.energyvoice.com/category/oilandgas/",
     "feed_url": null,
+    "enabled": false,
+    "max_entries": 0,
+    "lookback_days": 30,
     "base_domain": "energyvoice.com",
     "reliability_tier": 4,
     "notes": "Free-access energy publication with strong oil and gas coverage."
