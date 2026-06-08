@@ -1,0 +1,44 @@
+@import "tailwindcss";
+
+:root {
+  --color-bg: #eef3f1;
+  --color-panel: #f6f8f6;
+  --color-soft: #ecf1ef;
+  --color-ink: #10212c;
+  --color-ink-soft: #1d3645;
+  --color-muted-ink: #51626e;
+  --color-accent: #2b6f8a;
+}
+
+@theme inline {
+  --color-background: var(--color-bg);
+  --color-foreground: var(--color-ink);
+  --font-sans: "Avenir Next", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", "Consolas", monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgba(43, 111, 138, 0.12), transparent 32%),
+    radial-gradient(circle at top right, rgba(200, 129, 52, 0.12), transparent 22%),
+    linear-gradient(180deg, #f3f6f5 0%, #e8eeeb 100%);
+  color: var(--color-ink);
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+a,
+button {
+  cursor: pointer;
+}
+
+::selection {
+  background: rgba(43, 111, 138, 0.18);
+}
