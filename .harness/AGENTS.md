@@ -4,6 +4,15 @@
 
 IndustryMapper is a multi-industry geospatial news intelligence platform.
 
+## Current POC Lock
+
+The active POC scope is currently locked to:
+
+1. `Semiconductors`
+2. `Oil & Gas`
+
+Critical minerals remains a later-phase expansion, not part of the first implementation slice.
+
 Its job is to:
 
 1. Ingest reputable articles and official notices
@@ -228,6 +237,31 @@ Agents should align to the existing plan:
 - `tags`
 - `weekly_summaries`
 
+### Current taxonomy lock
+
+Use the following subsectors for the first implementation phase.
+
+Semiconductors:
+
+- `EDA and Semiconductor IP`
+- `Fabless Chip Design`
+- `Foundry and Wafer Fabrication`
+- `Integrated Device Manufacturers`
+- `Semiconductor Equipment`
+- `Materials and Wafers`
+- `Assembly, Packaging, and Test`
+- `Memory Devices`
+
+Oil & Gas:
+
+- `Upstream Exploration and Production`
+- `Oilfield Services and Drilling`
+- `Midstream Transportation and Storage`
+- `Gas Processing and LNG`
+- `Refining`
+- `Petrochemicals and NGLs`
+- `Fuel Marketing and Distribution`
+
 ### Geospatial rules
 
 - Use `PostGIS` for stored event geometry
@@ -235,6 +269,20 @@ Agents should align to the existing plan:
 - Design for bounding-box queries early
 - Support one article creating many events
 - Support many articles referring to one real-world event later
+- Implement article-to-event traceability through a join table, not a single `source_article_id` column on `events`
+
+### Severity model lock
+
+Use a `0-5` severity scale:
+
+- `0 Neutral` = Green
+- `1 Low Significance` = Yellow
+- `2 Guarded` = Orange
+- `3 Elevated` = Red
+- `4 Severe` = Dark Purple
+- `5 Critical` = Black
+
+Frontend map markers should derive color state directly from this severity scale.
 
 ## Frontend Architecture Rules
 
@@ -460,7 +508,7 @@ Agents should work in this order unless there is a strong reason not to:
 
 The POC is successful when:
 
-- at least 2 to 3 industries are seeded
+- the two locked industries are seeded
 - curated sources ingest on schedule
 - articles become structured events
 - events are visible on a world map

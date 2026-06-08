@@ -58,20 +58,19 @@ To avoid overbuilding, the first prototype should focus on a narrow but convinci
 
 Recommended POC constraints:
 
-- Track 2 to 3 industries only
+- Track 2 industries only in the first slice
 - Use 10 to 20 reputable sources total
 - Focus on one event ingestion cadence, such as daily or twice daily
 - Extract only the most important event fields
 - Show events on a world map plus a simple list/detail panel
 - Generate one weekly summary per tracked industry
 
-Recommended initial industries:
+Locked initial industries:
 
 1. Semiconductors
 2. Oil and gas
-3. Critical minerals or rare earths
 
-These are strong candidates because they are globally relevant, geopolitically sensitive, and map well to supply chain disruption use cases.
+Critical minerals or rare earths remain a later expansion phase after the first POC proves the data model and ingestion path.
 
 ## 5. Foundation First: Industry Model
 
@@ -168,13 +167,11 @@ Each event should ideally include:
 - `event_type`
 - `severity_score`
 - `confidence_score`
-- `country`
-- `region`
-- `latitude`
-- `longitude`
-- `source_article_id`
-- `published_at`
+- `event_status`
+- `event_date`
 - `detected_at`
+
+Store geography in `event_locations`, and store article traceability in an `event_articles` join table instead of a single `source_article_id`.
 
 ### 6.3 Event type candidates
 
@@ -494,21 +491,31 @@ Deliverables:
 
 A simple severity model is enough for the POC.
 
-Suggested 1 to 5 scale:
+Locked 0 to 5 scale:
 
-1. Low: minor local relevance
-2. Moderate: noteworthy operational impact
-3. Significant: regional disruption or policy shift
-4. High: major national or cross-border impact
+0. Neutral: material industry news without a clear disruption or risk signal
+1. Low Significance: minor local relevance or early signal
+2. Guarded: contained operational or policy impact
+3. Elevated: regional disruption or major company-level impact
+4. Severe: major cross-border or multi-company disruption
 5. Critical: global supply chain or geopolitical impact
 
 This should be paired with a confidence score so severity is never shown without context.
+
+Locked color mapping:
+
+- `0` Green
+- `1` Yellow
+- `2` Orange
+- `3` Red
+- `4` Dark Purple
+- `5` Black
 
 ## 18. Suggested Next-Week POC Milestone
 
 If the goal is a prototype by next week, the most realistic target is:
 
-"A map showing AI-extracted events for 2 to 3 industries from a curated source list, with filtering by industry, event type, and severity."
+"A map showing AI-extracted events for semiconductors and oil and gas from a curated source list, with filtering by industry, event type, and severity."
 
 That is ambitious but still achievable if scope is held tightly.
 
@@ -525,13 +532,21 @@ That is ambitious but still achievable if scope is held tightly.
 5. Source shortlist
 6. Severity scoring rubric
 
+Current status:
+
+- initial industries locked
+- taxonomy drafted
+- source shortlist drafted
+- severity scoring rubric locked
+- schema drafted
+
 ## 20. Recommended Decisions
 
 If no major objections come up, I recommend the project starts with:
 
-1. Industries: Semiconductors, Oil and Gas, Critical Minerals
+1. Industries: Semiconductors and Oil and Gas
 2. Taxonomy: `industry -> subsector`
-3. Core units: `article -> event -> mapped location`
+3. Core units: `article -> event -> mapped location`, with `event_articles` handling article-to-event traceability
 4. POC sources: curated, reputable, low-volume
 5. Website language: `TypeScript`
 6. Ingestion language: `Python`
