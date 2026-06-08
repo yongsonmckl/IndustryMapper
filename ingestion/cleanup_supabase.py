@@ -31,7 +31,12 @@ def main() -> None:
         json={"retention_days": retention_days},
         timeout=TIMEOUT_SECONDS,
     )
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        raise RuntimeError(
+            f"HTTP {response.status_code} from {response.request.method} {response.url}: {response.text.strip()[:2000]}",
+        ) from exc
     print(json.dumps(response.json(), indent=2))
 
 

@@ -169,6 +169,17 @@ def write_artifact(name: str, payload: dict[str, Any]) -> Path:
     return path
 
 
+def raise_for_status_with_context(response: requests.Response) -> None:
+    try:
+        response.raise_for_status()
+    except requests.HTTPError as exc:
+        response_body = response.text.strip()[:2000]
+        request = response.request
+        raise RuntimeError(
+            f"HTTP {response.status_code} from {request.method} {response.url}: {response_body}",
+        ) from exc
+
+
 def upsert_to_supabase(source_results: list[dict[str, Any]]) -> None:
     supabase_url = os.getenv("SUPABASE_URL")
     api_key = os.getenv("SUPABASE_API_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
@@ -176,6 +187,10 @@ def upsert_to_supabase(source_results: list[dict[str, Any]]) -> None:
     if not supabase_url or not api_key:
         print("SUPABASE_URL or SUPABASE_API_KEY not set; skipping database write.")
         return
+    if not ingest_token:
+        raise RuntimeError(
+            "SUPABASE_INGEST_TOKEN is not set. Add the repository secret before running ingestion.",
+        )
 
     headers = {
         "apikey": api_key,
@@ -183,8 +198,7 @@ def upsert_to_supabase(source_results: list[dict[str, Any]]) -> None:
         "Content-Type": "application/json",
         "Prefer": "resolution=merge-duplicates",
     }
-    if ingest_token:
-        headers["x-ingest-token"] = ingest_token
+    headers["x-ingest-token"] = ingest_token
 
     sources = load_sources()
     tracked_slugs = [source.slug for source in sources]
@@ -195,7 +209,7 @@ def upsert_to_supabase(source_results: list[dict[str, Any]]) -> None:
         params={"select": "id,slug", "slug": f"in.({slug_filter})"},
         timeout=TIMEOUT_SECONDS,
     )
-    response.raise_for_status()
+    raise_for_status_with_context(response)
     source_id_map = {row["slug"]: row["id"] for row in response.json()}
 
     for result in source_results:
@@ -229,7 +243,7 @@ def upsert_to_supabase(source_results: list[dict[str, Any]]) -> None:
             json=rows,
             timeout=TIMEOUT_SECONDS,
         )
-        response.raise_for_status()
+        raise_for_status_with_context(response)
 
 
 def main() -> None:
