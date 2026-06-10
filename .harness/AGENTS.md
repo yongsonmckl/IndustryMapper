@@ -29,18 +29,19 @@ Current live foundation:
 
 Current runtime state as of `2026-06-10`:
 
-- `133` articles have been ingested
-- enrichment has processed most of the current article backlog
-- `14` articles are marked `evented`
-- `12` articles are marked `pending`
-- `107` articles are marked `no_event`
-- `14` `heuristic_v2` events are currently exposed through the safe public read path
+- `151` articles have been ingested
+- enrichment backlog has been fully reprocessed
+- `7` articles are marked `evented`
+- `0` articles are marked `pending`
+- `144` articles are marked `no_event`
+- `7` `heuristic_v3` events are currently exposed through the safe public read path
 
 Important operational note:
 
 - Runtime data was intentionally reset on `2026-06-08`
 - The old exploratory `heuristic_v1` derived rows have been deleted
-- The app and public RPC read `heuristic_v2` only
+- low-quality earlier event rows were later cleared during the quality rebuild
+- the app and public RPC read `heuristic_v3` only
 
 ## Current Source of Truth
 
@@ -214,7 +215,8 @@ Current implementation notes:
 - existing article hashes already in Supabase are skipped before insert
 - `enrich_events.py` processes pending articles into events
 - conservative non-event filtering is active
-- only `heuristic_v2` events are used by the app read path
+- event-level dedupe is active during enrichment
+- only `heuristic_v3` events are used by the app read path
 - `cleanup_supabase.py` runs retention cleanup after enrichment
 
 Retention rule:
@@ -234,6 +236,11 @@ Current known secret:
 
 - `SUPABASE_INGEST_TOKEN`
 
+Operational caution:
+
+- service-role credentials were used manually during live repair and rebuild work
+- scheduled jobs should still prefer the scoped ingest-token path
+
 Current public read pattern:
 
 - do not expose raw event tables broadly
@@ -246,6 +253,7 @@ Current public read pattern:
 - Keep filters URL-addressable where practical
 - Keep map interaction state close to the map UI
 - Build around real Supabase-backed data contracts, not long-lived mocks
+- Treat the current map implementation in `web/src/components/event-console.tsx` as the baseline, not a prototype to discard
 
 ## Agent Roster
 
@@ -329,12 +337,12 @@ Owns:
 
 The foundation is now far enough along to move in this order:
 
-1. improve event extraction quality and false-positive controls
-2. process the remaining `12` pending articles with the current or improved extractor
-3. add canonical coordinate coverage beyond country centroids
-4. build the actual map layer on top of the existing event RPC
+1. review recent `no_event` articles for false negatives under `heuristic_v3`
+2. add broader canonical coordinate coverage beyond the current alias set
+3. harden dense-area marker overlap and clustering behavior
+4. add repeatable QA and observability around enrichment drift
 5. add weekly summary generation
-6. harden QA and observability
+6. address broader Supabase security/config warnings when product priorities allow
 
 ## Refinement Rule
 
@@ -348,8 +356,8 @@ Current refinement priority:
 
 What should be refined now:
 
-- `Phase 3` enrichment quality
-- `Phase 4` geospatial accuracy and map-readiness
+- `Phase 3` enrichment quality and recall measurement
+- `Phase 4` geospatial accuracy and map interaction polish
 
 What should wait until later:
 

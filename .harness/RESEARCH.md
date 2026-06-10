@@ -141,18 +141,25 @@ Current live fix:
 
 - single-token keyword matching now uses word boundaries
 - generic product-introduction wording was removed from event creation
-- `heuristic_v2` is the current public extraction version
+- generic investment language is no longer enough on its own to create an event
+- event creation now requires stronger concrete anchors for investment, conflict, labor, and policy cases
+- event-level dedupe now prevents multiple near-identical articles from creating duplicate product rows
+- `heuristic_v3` is the current public extraction version
 - the older exploratory `heuristic_v1` derived rows have been deleted
 
-### 3. Early geospatial assignment is acceptable through country centroids
+### 3. Geospatial assignment has moved beyond pure country centroids, but is still incomplete
 
-For the first live event surface, country centroid matching is good enough to move forward.
+The first live event surface no longer relies only on country centroids. The system now prefers canonical resolved locations and can use aliases for common place mentions.
 
-It is not sufficient for final map quality, but it is enough to:
+It is still not sufficient for final map quality, but it is enough to:
 
 - show the first geography-aware events
-- support a first event console
+- support a real map surface
 - prove the article-to-event-to-location flow
+
+Current limitation:
+
+- plant, port, city, and state resolution coverage still needs to expand
 
 ### 4. Refinement should target quality bottlenecks, not old phases in general
 
@@ -178,6 +185,10 @@ Why this is better right now:
 - smaller blast radius than broad anonymous table reads
 - enough for the app to fetch product-safe event data
 - cleaner upgrade path for future auth or policy refinement
+
+Current live implementation note:
+
+- the app now defaults to `heuristic_v3` only through the public RPC path
 
 ## Infrastructure Research Updates
 
@@ -224,4 +235,20 @@ Locked for the first POC:
 6. Database strategy: one Supabase project for many industries
 7. Retention strategy: automated `14` day article retention
 8. Dedupe strategy: pre-insert canonical article selection
-9. Current public event version: `heuristic_v2`
+9. Event dedupe strategy: prevent duplicate event creation across overlapping article coverage
+10. Current public event version: `heuristic_v3`
+
+## Current Runtime Quality Snapshot
+
+As of `2026-06-10`, after the live rebuild:
+
+- `151` recent articles are present
+- `7` articles are currently `evented`
+- `144` articles are currently `no_event`
+- `0` articles are currently `pending`
+- the public app surface shows `7` live `heuristic_v3` events
+
+Research implication:
+
+- the immediate question is no longer false-positive control alone
+- the next question is whether event recall has become too strict

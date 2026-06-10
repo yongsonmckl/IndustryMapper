@@ -56,6 +56,16 @@ Current limitation:
 
 - this is country-centroid quality, not true facility or city-quality geocoding
 
+### `data/geo/location_aliases.json`
+
+Purpose:
+
+- alias and canonical-location lookup support for higher-quality event geospatial assignment
+
+Current limitation:
+
+- coverage is still selective, not a full global resolver
+
 ## 4. `ingestion/`
 
 Purpose:
@@ -78,12 +88,13 @@ Key files:
   - writes ingestion snapshot artifact
 
 - `enrich_events.py`
-  - first live article-to-event enrichment job
+  - live article-to-event enrichment job
   - processes `pending` articles
   - creates `events`, `event_locations`, and `event_articles`
-  - marks articles as `evented`, `no_event`, or `error`
+  - marks articles as `evented`, `no_event`, or retryable `error`
   - writes enrichment snapshot artifact
-  - current public extraction version is `heuristic_v2`
+  - current public extraction version is `heuristic_v3`
+  - includes event-level dedupe, stronger confidence gates, and canonical location resolution
 
 - `cleanup_supabase.py`
   - calls the Supabase retention RPC after ingest and enrichment
@@ -127,6 +138,17 @@ Key files:
   - narrow public event read function
   - current safe read path for the frontend
 
+- `20260610_006_phase34_refinements.sql`
+  - phase 3 and 4 event-quality and geo-path upgrades
+
+- `20260610_007_canonical_location_fix.sql`
+  - canonical location handling and related event-location fixes
+
+- `20260610_008_viewport_and_perf_hardening.sql`
+  - viewport filtering fix for canonical geometries
+  - RPC default extraction version update
+  - performance indexes
+
 ### `supabase/seeds/`
 
 Key files:
@@ -143,9 +165,9 @@ Live project state:
 - project name: `industrymapper`
 - project ref: `uwfpjwlkypryqhfmbybj`
 - `articles` are populated
-- current article enrichment state: `14 evented`, `12 pending`, `107 no_event`
-- `heuristic_v2` events are populated and visible through the RPC
-- `heuristic_v1` rows have already been removed
+- current article enrichment state: `7 evented`, `0 pending`, `144 no_event`
+- `heuristic_v3` events are populated and visible through the RPC
+- low-quality earlier event rows were removed during the quality rebuild
 
 ## 6. `.github/workflows/`
 
@@ -183,9 +205,15 @@ Purpose:
 Key files:
 
 - `src/app/page.tsx`
-  - current live event console
-  - server-rendered list and detail flow
-  - URL-addressable industry and severity filters
+  - current live event console shell
+  - server-rendered initial data load
+
+- `src/components/event-console.tsx`
+  - live client-side event console and map surface
+  - severity-colored markers
+  - URL-addressable filters
+  - viewport-aware event loading
+  - event selection and detail flow
 
 - `src/app/api/events/route.ts`
   - API wrapper for live public event listing
@@ -207,7 +235,7 @@ Key files:
 
 Current limitation:
 
-- the app is now live against real events, but it is not a true map UI yet
+- the app is now a true map UI, but dense-area overlap and clustering still need polish
 
 ## 8. Current Product State
 
@@ -223,23 +251,25 @@ What is already real:
 - pre-insert article dedupe exists
 - narrow public event RPC exists
 - frontend event console exists
+- live map surface exists
+- viewport-driven event loading exists
+- canonical-location viewport filtering is fixed
 
 What is not done yet:
 
-- stronger event-quality controls
-- processing the remaining pending articles
-- better location quality than country centroids
-- actual map rendering
+- false-negative review of the stricter extractor
+- broader plant, port, city, and state location coverage
+- clustering and dense-marker overlap polish
 - weekly summary generation
 
 ## 9. Next Model Priorities
 
 If another model takes over, the correct next order is:
 
-1. improve event extraction quality and reduce false positives
-2. process the remaining pending articles
-3. improve geospatial assignment
-4. build the first real map layer on top of `list_public_events`
+1. improve event extraction quality and reduce false negatives
+2. measure false negatives across recent `no_event` articles
+3. improve geospatial assignment coverage
+4. polish clustering and dense-area map interaction
 5. add weekly summary generation
 
 ## 10. Refinement Guidance

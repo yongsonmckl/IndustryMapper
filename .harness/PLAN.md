@@ -43,17 +43,18 @@ Implemented foundation:
 
 Current runtime state as of `2026-06-10`:
 
-- `133` articles ingested
-- `14` articles classified as event-bearing
-- `12` articles still pending enrichment
-- `107` articles classified as no-event
-- `14` `heuristic_v2` events exposed to the app
+- `151` articles ingested
+- `7` articles classified as event-bearing
+- `0` articles pending enrichment
+- `144` articles classified as no-event
+- `7` `heuristic_v3` events exposed to the app
 
 Important current state:
 
 - runtime data was reset intentionally on `2026-06-08`
 - the old exploratory `heuristic_v1` event batch has already been deleted
-- the current app surface reads `heuristic_v2`
+- low-quality `heuristic_v2` event rows were later removed during the `2026-06-10` quality rebuild
+- the current app surface reads `heuristic_v3`
 
 ## 4. Current Architecture
 
@@ -138,8 +139,9 @@ Current enrichment notes:
 
 - heuristic event extraction is live
 - non-event filtering is active
-- early location assignment currently relies on country centroid matches
-- `heuristic_v2` is the current public extraction version
+- location assignment now prefers canonical resolved locations and falls back to country-level geometry only when necessary
+- event-level dedupe is active
+- `heuristic_v3` is the current public extraction version
 
 ## 7. Severity Model
 
@@ -173,11 +175,15 @@ This risk is now cleared. `heuristic_v1` rows have been deleted.
 
 ### 8.3 Risk: location coverage is still shallow
 
-Country centroid mapping is enough for the first surface, but not enough for true map quality.
+Canonical location handling is better than the first centroid-only pass, but facility, port, and city resolution still needs broader coverage and validation.
 
 ### 8.4 Risk: no actual map renderer yet
 
-The event console and detail flow are live, but the map layer itself is not yet implemented.
+This risk is cleared. A live map renderer and event console are now implemented on top of the public RPC.
+
+### 8.5 Risk: event recall may now be too strict
+
+The `heuristic_v3` cleanup fixed obvious false positives, but the live post-ingest state is still only `7` events from `151` recent articles. The next task is measuring whether false negatives are now too high.
 
 ## 9. Revised Delivery Phases
 
@@ -220,7 +226,7 @@ Delivered:
 
 ### Phase 3: Event Enrichment
 
-Status: first live implementation exists.
+Status: implemented and rebuilt live.
 
 Delivered:
 
@@ -230,31 +236,39 @@ Delivered:
 - country centroid seed file
 - event/article linking
 - enrichment artifact
+- stronger non-event filtering
+- event-level dedupe
+- richer structured extraction fields
+- confidence thresholds and retry-aware status handling
+- backlog fully reprocessed into `heuristic_v3`
 
 Still needed:
 
-- stronger event filtering
-- better subsector coverage
-- stronger geospatial assignment
-- long-term event dedupe
+- false-negative review on recent `no_event` articles
+- broader subsector and location coverage as live volume grows
+- stronger QA reporting around drift over time
 
 ### Phase 4: Event Frontend
 
-Status: first live implementation exists.
+Status: baseline implementation complete.
 
 Delivered:
 
 - live event RPC
 - event API route
 - server-rendered event console
+- live map renderer
+- severity-colored markers
 - industry and severity filters
 - event detail surface
+- viewport-driven loading
+- URL-addressable filter state
 
 Still needed:
 
-- actual map renderer
-- viewport-driven geo queries
-- richer event filtering
+- denser-area overlap and clustering polish
+- broader mobile and desktop interaction QA
+- richer filter polish once live event volume increases
 
 ### Phase 5: Weekly Intelligence Layer
 
@@ -264,12 +278,12 @@ Status: not started beyond schema support.
 
 The best next sequence from the current state is:
 
-1. improve enrichment quality and remove obvious false positives
-2. process the remaining `12` pending articles
-3. improve geospatial assignment beyond country centroids
-4. build the first real map surface on top of the existing event RPC
+1. review recent `no_event` articles to measure `heuristic_v3` false negatives
+2. improve location resolution coverage for plant, port, city, and state mentions
+3. harden map interaction for dense marker overlap and clustering
+4. add a lightweight evaluation and drift-reporting path after each enrichment run
 5. add weekly summary generation
-6. harden observability around enrichment drift
+6. address broader Supabase security advisor warnings when product work allows
 
 ## 11. Refinement Policy
 
@@ -300,4 +314,4 @@ Leave these for later unless they become blockers:
 
 The next milestone is now:
 
-`A stable map surface renders only high-confidence live events from the current pipeline, with acceptable location quality and traceable links back to source articles.`
+`The live map surface remains trustworthy after repeated production runs, with measured event quality, stronger location precision, and clear operator visibility into drift or regressions.`
