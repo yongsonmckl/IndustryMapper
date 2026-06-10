@@ -1,0 +1,235 @@
+[
+  {
+    "name": "Texas",
+    "aliases": ["texas"],
+    "latitude": 31.9686,
+    "longitude": -99.9018,
+    "country_iso3": "USA",
+    "admin1": "Texas",
+    "location_role": "affected_area",
+    "precision": "state"
+  },
+  {
+    "name": "Louisiana",
+    "aliases": ["louisiana"],
+    "latitude": 30.9843,
+    "longitude": -91.9623,
+    "country_iso3": "USA",
+    "admin1": "Louisiana",
+    "location_role": "affected_area",
+    "precision": "state"
+  },
+  {
+    "name": "Brussels",
+    "aliases": ["brussels", "european union", "eu"],
+    "latitude": 50.8503,
+    "longitude": 4.3517,
+    "country_iso3": "BEL",
+    "city": "Brussels",
+    "location_role": "market",
+    "precision": "city"
+  },
+  {
+    "name": "Strait of Hormuz",
+    "aliases": ["strait of hormuz", "hormuz"],
+    "latitude": 26.566,
+    "longitude": 56.25,
+    "country_iso3": "OMN",
+    "location_role": "affected_area",
+    "precision": "strait"
+  },
+  {
+    "name": "Red Sea",
+    "aliases": ["red sea"],
+    "latitude": 20.0,
+    "longitude": 38.0,
+    "country_iso3": "SAU",
+    "location_role": "affected_area",
+    "precision": "sea"
+  },
+  {
+    "name": "Suez Canal",
+    "aliases": ["suez canal", "suez"],
+    "latitude": 30.585,
+    "longitude": 32.265,
+    "country_iso3": "EGY",
+    "location_role": "affected_area",
+    "precision": "canal"
+  },
+  {
+    "name": "Singapore",
+    "aliases": ["singapore", "port of singapore"],
+    "latitude": 1.29027,
+    "longitude": 103.851959,
+    "country_iso3": "SGP",
+    "city": "Singapore",
+    "location_role": "market",
+    "precision": "city"
+  },
+  {
+    "name": "Rotterdam",
+    "aliases": ["rotterdam", "port of rotterdam"],
+    "latitude": 51.92442,
+    "longitude": 4.477733,
+    "country_iso3": "NLD",
+    "city": "Rotterdam",
+    "location_role": "destination",
+    "precision": "port"
+  },
+  {
+    "name": "Houston",
+    "aliases": ["houston", "port of houston"],
+    "latitude": 29.760427,
+    "longitude": -95.369804,
+    "country_iso3": "USA",
+    "admin1": "Texas",
+    "city": "Houston",
+    "location_role": "destination",
+    "precision": "port"
+  },
+  {
+    "name": "Corpus Christi",
+    "aliases": ["corpus christi", "port of corpus christi"],
+    "latitude": 27.800583,
+    "longitude": -97.396378,
+    "country_iso3": "USA",
+    "admin1": "Texas",
+    "city": "Corpus Christi",
+    "location_role": "destination",
+    "precision": "port"
+  },
+  {
+    "name": "Sabine Pass",
+    "aliases": ["sabine pass"],
+    "latitude": 29.7283,
+    "longitude": -93.8707,
+    "country_iso3": "USA",
+    "admin1": "Texas",
+    "city": "Port Arthur",
+    "location_role": "facility",
+    "precision": "terminal"
+  },
+  {
+    "name": "Ras Tanura",
+    "aliases": ["ras tanura"],
+    "latitude": 26.6436,
+    "longitude": 50.1583,
+    "country_iso3": "SAU",
+    "city": "Ras Tanura",
+    "location_role": "facility",
+    "precision": "port"
+  },
+  {
+    "name": "Fujairah",
+    "aliases": ["fujairah", "port of fujairah"],
+    "latitude": 25.1288,
+    "longitude": 56.3265,
+    "country_iso3": "ARE",
+    "city": "Fujairah",
+    "location_role": "destination",
+    "precision": "port"
+  },
+  {
+    "name": "Hsinchu",
+    "aliases": ["hsinchu", "hsinchu science park"],
+    "latitude": 24.8138,
+    "longitude": 120.9675,
+    "country_iso3": "TWN",
+    "city": "Hsinchu",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Tainan",
+    "aliases": ["tainan", "southern taiwan science park"],
+    "latitude": 22.9999,
+    "longitude": 120.227,
+    "country_iso3": "TWN",
+    "city": "Tainan",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Kaohsiung",
+    "aliases": ["kaohsiung"],
+    "latitude": 22.6273,
+    "longitude": 120.3014,
+    "country_iso3": "TWN",
+    "city": "Kaohsiung",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Austin",
+    "aliases": ["austin"],
+    "latitude": 30.2672,
+    "longitude": -97.7431,
+    "country_iso3": "USA",
+    "admin1": "Texas",
+    "city": "Austin",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Chandler",
+    "aliases": ["chandler"],
+    "latitude": 33.3062,
+    "longitude": -111.8413,
+    "country_iso3": "USA",
+    "admin1": "Arizona",
+    "city": "Chandler",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Boise",
+    "aliases": ["boise"],
+    "latitude": 43.615,
+    "longitude": -116.2023,
+    "country_iso3": "USA",
+    "admin1": "Idaho",
+    "city": "Boise",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Dresden",
+    "aliases": ["dresden", "silicon saxony"],
+    "latitude": 51.0504,
+    "longitude": 13.7373,
+    "country_iso3": "DEU",
+    "city": "Dresden",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Penang",
+    "aliases": ["penang", "bayan lepas"],
+    "latitude": 5.4141,
+    "longitude": 100.3288,
+    "country_iso3": "MYS",
+    "city": "Penang",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Kulim",
+    "aliases": ["kulim", "kulim hi-tech park"],
+    "latitude": 5.3642,
+    "longitude": 100.5618,
+    "country_iso3": "MYS",
+    "city": "Kulim",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Ulsan",
+    "aliases": ["ulsan"],
+    "latitude": 35.5384,
+    "longitude": 129.3114,
+    "country_iso3": "KOR",
+    "city": "Ulsan",
+    "location_role": "facility",
+    "precision": "city"
+  }
+]

@@ -29,6 +29,7 @@ class EventLocationCandidate:
     country_iso3: str | None = None
     admin1: str | None = None
     city: str | None = None
+    precision: str | None = None
     is_canonical: bool = True
     confidence_score: float = 0.5
 
@@ -49,4 +50,9 @@ class EventCandidate:
     tags: list[str] = field(default_factory=list)
     locations: list[EventLocationCandidate] = field(default_factory=list)
     evidence_snippet: str | None = None
+    dedupe_key: str | None = None
+    extraction_reasons: list[str] = field(default_factory=list)
+    matched_terms: dict[str, list[str]] = field(default_factory=dict)
+    signal_score: float = 0.0
+    drop_reason: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)

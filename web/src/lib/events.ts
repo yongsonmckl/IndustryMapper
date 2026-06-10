@@ -13,13 +13,19 @@ export type PublicEvent = {
   event_date: string | null;
   detected_at: string;
   location_name: string | null;
+  location_role: string | null;
+  admin1: string | null;
+  city: string | null;
+  country_name: string | null;
   latitude: number | null;
   longitude: number | null;
+  article_count: number;
   source_url: string;
   source_slug: string;
   source_name: string;
   evidence_snippet: string | null;
   extraction_method: string;
+  dedupe_key: string | null;
 };
 
 export async function listPublicEvents(filters?: {
@@ -27,6 +33,13 @@ export async function listPublicEvents(filters?: {
   eventType?: string | null;
   minSeverity?: number | null;
   limit?: number;
+  viewport?: {
+    minLng: number;
+    minLat: number;
+    maxLng: number;
+    maxLat: number;
+  } | null;
+  extractionMethods?: string[] | null;
 }) {
   const supabase = getSupabaseServerClient();
   const { data, error } = await supabase.rpc("list_public_events", {
@@ -34,6 +47,11 @@ export async function listPublicEvents(filters?: {
     filter_event_type_slug: filters?.eventType ?? null,
     min_severity: filters?.minSeverity ?? null,
     limit_count: filters?.limit ?? 24,
+    viewport_min_lng: filters?.viewport?.minLng ?? null,
+    viewport_min_lat: filters?.viewport?.minLat ?? null,
+    viewport_max_lng: filters?.viewport?.maxLng ?? null,
+    viewport_max_lat: filters?.viewport?.maxLat ?? null,
+    filter_extraction_methods: filters?.extractionMethods ?? ["heuristic_v3"],
   });
 
   if (error) {
