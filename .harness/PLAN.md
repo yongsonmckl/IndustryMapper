@@ -25,7 +25,7 @@ Critical minerals remains a later-phase expansion.
 
 ## 3. What Already Exists
 
-The project is now past pure planning.
+The project is now well past pure planning.
 
 Implemented foundation:
 
@@ -34,15 +34,25 @@ Implemented foundation:
 - initial schema is applied
 - reference seed data is applied
 - source registry is seeded
+- country centroid data file exists for early geospatial assignment
 - GitHub Actions workflow exists and runs
 - retention cleanup exists and runs
-- a Next.js frontend shell exists
-- enrichment contracts and prompt scaffolding exist
+- event enrichment exists and runs
+- a Next.js frontend event console exists
+- a narrow public event RPC exists
+
+Current runtime state as of `2026-06-10`:
+
+- `133` articles ingested
+- `26` articles classified as event-bearing
+- `107` articles classified as no-event
+- `14` `heuristic_v2` events exposed to the app
 
 Important current state:
 
 - runtime data was reset intentionally on `2026-06-08`
-- the next ingest cycle should refill `articles` from a clean base
+- a first exploratory `heuristic_v1` event batch still exists in the database
+- the current app surface intentionally filters to `heuristic_v2`
 
 ## 4. Current Architecture
 
@@ -53,13 +63,21 @@ Important current state:
 - `React`
 - `Tailwind CSS`
 - app lives in `web/`
+- live route reads through a narrow public RPC, not raw table reads
 
-### Ingestion
+### Ingestion and enrichment
 
 - `Python`
 - scripts live in `ingestion/`
 - scheduler is GitHub Actions
 - workflow file: `.github/workflows/ingest-sources.yml`
+
+Current pipeline order:
+
+1. ingest sources
+2. enrich pending articles into events
+3. run retention cleanup
+4. upload artifacts
 
 ### Database
 
@@ -92,9 +110,9 @@ Important lock:
 - article-to-event traceability uses `event_articles`
 - do not revert to a single `source_article_id` field on `events`
 
-## 6. Current Ingestion Behavior
+## 6. Current Ingestion and Enrichment Behavior
 
-Current ingest pipeline behavior:
+Current automation behavior:
 
 1. fetch enabled feeds from the curated source registry
 2. normalize article records
@@ -102,8 +120,9 @@ Current ingest pipeline behavior:
 4. collapse syndicated duplicates before database write
 5. skip hashes already present in Supabase
 6. write new `articles`
-7. run retention cleanup
-8. upload ingestion snapshot artifact
+7. enrich `pending` articles into `events`
+8. run retention cleanup
+9. upload artifacts
 
 Current cleanup rule:
 
@@ -113,6 +132,13 @@ Current cleanup rule:
 Current schedule:
 
 - every 6 hours
+
+Current enrichment notes:
+
+- heuristic event extraction is live
+- non-event filtering is active
+- early location assignment currently relies on country centroid matches
+- `heuristic_v2` is the current public extraction version
 
 ## 7. Severity Model
 
@@ -136,27 +162,27 @@ Locked colors:
 
 ## 8. Current Risks
 
-### 8.1 Risk: no event layer yet
+### 8.1 Risk: event quality is still heuristic
 
-Current ingestion stores `articles`, but the POC is not complete until those become structured `events`.
+The event path is live, but the current extraction logic is still conservative heuristic classification rather than a reviewed AI-plus-rules pipeline.
 
-### 8.2 Risk: partial RLS coverage
+### 8.2 Risk: legacy exploratory derived rows still exist
 
-The ingest path has policy support, but broader read-path security still needs tightening before public app exposure.
+The app hides `heuristic_v1`, but those rows still exist in the database until explicit destructive cleanup is approved.
 
-### 8.3 Risk: frontend not yet wired to live event data
+### 8.3 Risk: location coverage is still shallow
 
-The web app scaffold exists, but it is not yet the finished map-driven product.
+Country centroid mapping is enough for the first surface, but not enough for true map quality.
 
-### 8.4 Risk: feed quality drift
+### 8.4 Risk: no actual map renderer yet
 
-Curated sources still need ongoing validation as feeds change or go stale.
+The event console and detail flow are live, but the map layer itself is not yet implemented.
 
 ## 9. Revised Delivery Phases
 
 ### Phase 0: Planning and Foundation
 
-Status: complete enough for implementation.
+Status: complete.
 
 Delivered:
 
@@ -181,7 +207,7 @@ Delivered:
 
 ### Phase 2: Ingestion Pipeline
 
-Status: working foundation.
+Status: live and functioning.
 
 Delivered:
 
@@ -191,42 +217,43 @@ Delivered:
 - ingest snapshot artifact
 - pre-insert dedupe
 
-Still needed:
+### Phase 3: Event Enrichment
 
-- more source validation
-- better feed health visibility
-
-### Phase 3: AI Enrichment
-
-Status: scaffold only.
+Status: first live implementation exists.
 
 Delivered:
 
-- prompt scaffold
-- Python model contracts
+- enrichment migration path
+- article enrichment status tracking
+- event extraction script
+- country centroid seed file
+- event/article linking
+- enrichment artifact
 
 Still needed:
 
-- article-to-event extraction job
-- event dedupe strategy
-- geocoding strategy
-- confidence and severity assignment logic
+- stronger event filtering
+- better subsector coverage
+- stronger geospatial assignment
+- long-term event dedupe
 
-### Phase 4: Map Frontend
+### Phase 4: Event Frontend
 
-Status: scaffold only.
+Status: first live implementation exists.
 
 Delivered:
 
-- Next.js app shell
-- bootstrap and health routes
+- live event RPC
+- event API route
+- server-rendered event console
+- industry and severity filters
+- event detail surface
 
 Still needed:
 
-- live event queries
-- viewport-driven map loading
-- filters
-- event details
+- actual map renderer
+- viewport-driven geo queries
+- richer event filtering
 
 ### Phase 5: Weekly Intelligence Layer
 
@@ -236,13 +263,12 @@ Status: not started beyond schema support.
 
 The best next sequence from the current state is:
 
-1. Let the improved ingest workflow repopulate `articles`
-2. Build the first article-to-event enrichment job
-3. Decide the first event type extraction rubric for the POC
-4. Add geocoding or canonical coordinate assignment for extracted events
-5. Enable event read-path RLS and public-safe query access
-6. Wire the frontend shell to real event queries
-7. Build map filters, list, and detail panel
+1. improve enrichment quality and remove obvious false positives
+2. decide whether to wipe legacy `heuristic_v1` derived rows
+3. improve geospatial assignment beyond country centroids
+4. build the first real map surface on top of the existing event RPC
+5. add weekly summary generation
+6. harden observability around enrichment drift
 
 ## 11. Foundation Rules That Should Not Change
 
@@ -251,11 +277,10 @@ The best next sequence from the current state is:
 - Stay on free plans unless explicitly approved otherwise
 - Keep curated sources ahead of broad scraping
 - Treat events, not articles, as the core product object
+- Prefer narrow RPC exposure over broad anonymous table reads
 
 ## 12. Definition of the Next Meaningful Milestone
 
-The next milestone is no longer "schema exists."
+The next milestone is now:
 
-The next meaningful milestone is:
-
-`A clean ingest cycle repopulates articles, an enrichment job converts them into structured events, and the frontend can render those events on a map with severity and source traceability.`
+`A stable map surface renders only high-confidence live events from the current pipeline, with acceptable location quality and traceable links back to source articles.`

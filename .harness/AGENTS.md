@@ -2,7 +2,7 @@
 
 ## Mission
 
-IndustryMapper is a multi-industry geospatial news intelligence platform that ingests trusted public sources, extracts structured real-world events, and maps them for fast operational understanding.
+IndustryMapper is a multi-industry geospatial news intelligence platform that ingests trusted public sources, extracts structured real-world events, and exposes them through a map-first intelligence surface.
 
 ## Current POC Lock
 
@@ -15,30 +15,42 @@ Critical minerals remains a later-phase expansion, not part of the first impleme
 
 ## Current Live State
 
-The project is no longer only in planning. The current foundation already exists:
+The project is in active implementation, not planning-only.
+
+Current live foundation:
 
 - GitHub repo: `yongsonmckl/IndustryMapper`
 - Supabase project: `industrymapper`
 - Supabase ref: `uwfpjwlkypryqhfmbybj`
 - Supabase URL: `https://uwfpjwlkypryqhfmbybj.supabase.co`
-- Frontend scaffold exists in `web/`
-- Ingestion scaffold exists in `ingestion/`
-- Scheduled GitHub Actions workflow exists in `.github/workflows/ingest-sources.yml`
+- Frontend app exists in `web/`
+- Ingestion and enrichment runtime exists in `ingestion/`
+- Scheduled workflow exists in `.github/workflows/ingest-sources.yml`
+
+Current runtime state as of `2026-06-10`:
+
+- `133` articles have been ingested
+- enrichment has processed the current article backlog
+- `26` articles are marked `evented`
+- `107` articles are marked `no_event`
+- `14` `heuristic_v2` events are currently exposed through the safe public read path
 
 Important operational note:
 
 - Runtime data was intentionally reset on `2026-06-08`
-- Schema, seeded reference tables, and source registry were preserved
-- `articles`, `events`, `event_locations`, `event_articles`, `event_tags`, `weekly_summaries`, `companies`, `countries`, and `tags` are empty by design
+- A first exploratory `heuristic_v1` event batch still exists in the database
+- The app and public RPC are deliberately filtered to `heuristic_v2` only
+- Removing the old `heuristic_v1` derived rows is a separate destructive cleanup decision
 
 ## Current Source of Truth
 
-The current authoritative implementation state is split as follows:
+The authoritative implementation state is split as follows:
 
 - Planning and handoff: `.harness/`
 - Database schema and policies: `supabase/migrations/`
 - Seeded reference data: `supabase/seeds/`
 - Source registry: `data/sources/initial_sources.json`
+- Geography seed data: `data/geo/country_centroids.json`
 - Ingestion runtime: `ingestion/`
 - Frontend application: `web/`
 
@@ -69,8 +81,8 @@ Do not collapse the stack into one language for convenience.
 
 ### Mapping
 
-- Base map renderer: `MapLibre GL JS`
-- React wrapper: `react-map-gl/maplibre`
+- Base map renderer target: `MapLibre GL JS`
+- React wrapper target: `react-map-gl/maplibre`
 - Advanced overlays later: `deck.gl`
 
 ### Ingestion and automation
@@ -79,6 +91,7 @@ Do not collapse the stack into one language for convenience.
 - Scheduler: `GitHub Actions`
 - Schedule: every 6 hours
 - Retention cleanup: automated after each ingest run
+- Enrichment: automated after each ingest run
 
 ## Stack Rules
 
@@ -94,7 +107,7 @@ All user-facing product code should default to TypeScript:
 - frontend data loading
 - shared schema types
 
-### Rule 2: Ingestion code lives in Python
+### Rule 2: Ingestion and enrichment live in Python
 
 All scheduled source collection and article processing code should default to Python:
 
@@ -103,6 +116,7 @@ All scheduled source collection and article processing code should default to Py
 - article extraction
 - normalization
 - dedupe prechecks
+- event extraction
 - enrichment orchestration
 
 ### Rule 3: Database remains the source of truth
@@ -181,14 +195,15 @@ Use a `0-5` severity scale:
 
 Frontend map markers should derive color state directly from this severity scale.
 
-## Current Ingestion Rules
+## Current Ingestion and Enrichment Rules
 
-The current ingestion path is intentionally narrow:
+The current automation path is intentionally narrow:
 
 - RSS-first
 - curated public sources only
 - dedupe before database write
-- retention cleanup after each run
+- event extraction after ingest
+- retention cleanup after enrichment
 
 Current implementation notes:
 
@@ -197,7 +212,10 @@ Current implementation notes:
 - syndicated duplicate stories are collapsed before insert
 - one winner is chosen across duplicate candidates based on source reliability, summary richness, and timestamp presence
 - existing article hashes already in Supabase are skipped before insert
-- `cleanup_supabase.py` runs retention cleanup after ingestion
+- `enrich_events.py` processes pending articles into events
+- conservative non-event filtering is active
+- only `heuristic_v2` events are used by the app read path
+- `cleanup_supabase.py` runs retention cleanup after enrichment
 
 Retention rule:
 
@@ -210,10 +228,16 @@ Retention rule:
 - Do not add a credit card or paid service path
 - Keep GitHub Actions secrets minimal
 - Prefer publishable-key plus scoped ingest token flows over broader service-role usage in scheduled jobs
+- Prefer narrow RPC exposure over broad anonymous table reads
 
 Current known secret:
 
 - `SUPABASE_INGEST_TOKEN`
+
+Current public read pattern:
+
+- do not expose raw event tables broadly
+- expose live product data through a narrow public RPC
 
 ## Frontend Architecture Rules
 
@@ -242,6 +266,7 @@ Owns:
 - migrations
 - event taxonomy
 - severity model
+- safe read/query surfaces
 
 ## 3. Source Registry Agent
 
@@ -266,6 +291,7 @@ Owns:
 Owns:
 
 - event extraction prompts
+- heuristic and model-based classification
 - industry and subsector classification
 - event type tagging
 - severity scoring
@@ -276,6 +302,7 @@ Owns:
 Owns:
 
 - event coordinate strategy
+- country and location assignment
 - bounding-box query design
 - map payload shape
 
@@ -283,6 +310,7 @@ Owns:
 
 Owns:
 
+- live event console
 - map UI
 - filters
 - event list and detail views
@@ -293,21 +321,20 @@ Owns:
 Owns:
 
 - workflow sanity
-- ingestion snapshots
+- ingestion and enrichment snapshots
 - duplicate monitoring
-- end-to-end checks from ingest to map
+- end-to-end checks from ingest to event console
 
 ## Build Order From Here
 
-The earlier foundation work is complete enough to move to the next sequence:
+The foundation is now far enough along to move in this order:
 
-1. Refill `articles` using the improved ingest pipeline
-2. Add AI enrichment from `articles` to `events`
-3. Enable safe read-path RLS for public event consumption
-4. Connect frontend shell to live Supabase data
-5. Build map filters and event detail flow
-6. Add weekly summary generation
-7. Harden QA and observability
+1. improve event extraction quality and false-positive controls
+2. decide whether to wipe legacy `heuristic_v1` derived rows
+3. add canonical coordinate coverage beyond country centroids
+4. build the actual map layer on top of the existing event RPC
+5. add weekly summary generation
+6. harden QA and observability
 
 ## Non-Negotiables
 
@@ -325,4 +352,5 @@ When in doubt:
 - keep the website in TypeScript
 - keep the ingestion in Python
 - keep the infrastructure free
+- expose only narrow public read surfaces
 - optimize for event clarity over feature count

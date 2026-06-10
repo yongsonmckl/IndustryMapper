@@ -1,8 +1,8 @@
 # IndustryMapper Research
 
-Last updated: 2026-06-08
+Last updated: 2026-06-10
 
-This file captures the current planning and implementation-phase research that locks the first POC scope, subsector taxonomy, severity scale, source shortlist, and current infrastructure decisions.
+This file captures the current planning and implementation-phase research that locks the first POC scope, subsector taxonomy, severity scale, source shortlist, infrastructure decisions, and the current enrichment strategy.
 
 ## Phase Scope Lock
 
@@ -35,13 +35,6 @@ Recommended semiconductor subsectors for the POC:
 7. `Assembly, Packaging, and Test`
 8. `Memory Devices`
 
-Why this structure:
-
-- it maps directly to where disruptions actually happen
-- it aligns with company archetypes users already recognize
-- it is better for event extraction than product-only categories
-- it scales later into product overlays without redesigning the core taxonomy
-
 ### Oil & Gas
 
 The oil and gas value chain is consistently described in public official and trade sources as `upstream`, `midstream`, and `downstream`. EPA uses those three sectors directly. GPA Midstream expands the operational detail and places gathering, processing, transportation, and storage in midstream, while refining and petrochemical transformation sit downstream.
@@ -62,12 +55,6 @@ Recommended oil and gas subsectors for the POC:
 6. `Petrochemicals and NGLs`
 7. `Fuel Marketing and Distribution`
 
-Why this structure:
-
-- it matches the value chain used in public reporting
-- it creates obvious event geography
-- it separates physical disruptions from policy and market effects cleanly
-
 ## Severity Framework Research
 
 Your requested `0-5` severity model remains the correct choice for the POC because it preserves relevant neutral news without forcing artificial risk inflation.
@@ -83,11 +70,6 @@ Locked severity model:
 | `4` | `Severe` | Cross-border or multi-company disruption with major supply chain implications. | `Dark Purple` |
 | `5` | `Critical` | Systemic or globally material event with major geopolitical or supply chain consequences. | `Black` |
 
-UI note:
-
-- the map icon and surrounding ring should derive directly from this severity value
-- `0` should still render on the map, but read as informative rather than urgent
-
 ## Source Research
 
 Selection rules used:
@@ -97,11 +79,7 @@ Selection rules used:
 - useful for RSS-first or simple structured ingestion
 - strong enough editorial or institutional credibility to support a curated POC
 
-### Current registry status
-
-Not every researched source is active in the current ingestion workflow.
-
-Current actively enabled feeds are:
+### Current actively enabled feeds
 
 - `EE Times`
 - `Electronics Weekly`
@@ -110,26 +88,6 @@ Current actively enabled feeds are:
 - `Rigzone`
 
 Other researched sources remain part of the registry but may be disabled pending better feed or parser support.
-
-### Researched semiconductor sources
-
-1. `Semiconductor Industry Association (SIA)`
-2. `SEMI Newsroom`
-3. `Semiconductor Engineering`
-4. `EE Times`
-5. `Electronics Weekly`
-6. `Semiconductor Today`
-7. `Bureau of Industry and Security (BIS)`
-
-### Researched oil & gas sources
-
-8. `U.S. Energy Information Administration (EIA)`
-9. `U.S. Department of Energy - Oil & Natural Gas News`
-10. `Bureau of Ocean Energy Management (BOEM)`
-11. `Rigzone`
-12. `World Oil`
-13. `Offshore Technology`
-14. `Energy Voice`
 
 ## Ingestion Research Updates
 
@@ -143,7 +101,7 @@ The sources that worked most reliably for fast implementation were the ones with
 
 Syndicated or near-identical stories can waste database space quickly on a small free-tier project.
 
-Current dedupe strategy now implemented in ingestion:
+Current dedupe strategy implemented in ingestion:
 
 - normalize URLs
 - strip common tracking parameters
@@ -153,8 +111,6 @@ Current dedupe strategy now implemented in ingestion:
 - skip hashes already stored in Supabase
 
 ### 3. Retention is necessary on the free plan
-
-Database storage is limited enough that retention should not be treated as optional.
 
 Current implemented rule:
 
@@ -166,13 +122,57 @@ Current implemented rule:
 
 Because only early ingest data existed and no event layer depended on it yet, resetting runtime data was simpler than trying to repair historical duplicates in place.
 
+## Event Enrichment Research Updates
+
+### 1. Conservative filtering is necessary
+
+A large share of industry articles are informative but not map-worthy operational events.
+
+The current live pipeline therefore filters aggressively:
+
+- many articles are classified as `no_event`
+- only a smaller subset are converted into event objects
+
+### 2. Substring keyword matching is too loose
+
+An early live pass produced false positives because naive substring matching can misread terms such as `war` inside `hardware`.
+
+Current live fix:
+
+- single-token keyword matching now uses word boundaries
+- generic product-introduction wording was removed from event creation
+- `heuristic_v2` is the current public extraction version
+
+### 3. Early geospatial assignment is acceptable through country centroids
+
+For the first live event surface, country centroid matching is good enough to move forward.
+
+It is not sufficient for final map quality, but it is enough to:
+
+- show the first geography-aware events
+- support a first event console
+- prove the article-to-event-to-location flow
+
+## Public Read Path Research Updates
+
+The safer design for the current POC is:
+
+- keep raw tables protected
+- expose a narrow public RPC for event consumption
+
+Why this is better right now:
+
+- smaller blast radius than broad anonymous table reads
+- enough for the app to fetch product-safe event data
+- cleaner upgrade path for future auth or policy refinement
+
 ## Infrastructure Research Updates
 
 ### Supabase project decision
 
 The project is correctly using a single Supabase project for multiple industries.
 
-Why this is still the right decision:
+Why this remains correct:
 
 - easier cross-industry querying
 - one schema and one ingest pipeline
@@ -196,6 +196,8 @@ These design changes are now locked:
    - use `event_articles` instead
 2. dedupe must happen before insert, not only after storage growth becomes visible
 3. article retention must be automated as part of the ingest workflow
+4. article enrichment state must be tracked explicitly
+5. public event consumption should go through a narrow RPC rather than broad raw table exposure
 
 ## Current Decision Summary
 
@@ -203,11 +205,10 @@ Locked for the first POC:
 
 1. Industries: `Semiconductors`, `Oil & Gas`
 2. Taxonomy model: `industry -> subsector`
-3. Semiconductor taxonomy: supply-chain and business-model oriented
-4. Oil & gas taxonomy: value-chain oriented
-5. Severity scale: `0-5`
-6. Severity colors: `Green`, `Yellow`, `Orange`, `Red`, `Dark Purple`, `Black`
-7. Source strategy: curated public sources with RSS-first ingestion
-8. Database strategy: one Supabase project for many industries
-9. Retention strategy: automated `14` day article retention
-10. Dedupe strategy: pre-insert canonical article selection
+3. Severity scale: `0-5`
+4. Severity colors: `Green`, `Yellow`, `Orange`, `Red`, `Dark Purple`, `Black`
+5. Source strategy: curated public sources with RSS-first ingestion
+6. Database strategy: one Supabase project for many industries
+7. Retention strategy: automated `14` day article retention
+8. Dedupe strategy: pre-insert canonical article selection
+9. Current public event version: `heuristic_v2`

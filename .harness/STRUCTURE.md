@@ -1,18 +1,18 @@
 # IndustryMapper Structure Handover
 
-Last updated: 2026-06-08
+Last updated: 2026-06-10
 
-This file is for handover to another model. It describes the current repo structure, what each area owns, and what the next model should treat as the live foundation.
+This file is for handover to another model. It describes the current repo structure, what each area owns, what is live today, and what the next model should treat as the implementation baseline.
 
 ## 1. Top-Level Layout
 
 ```text
 .github/      GitHub Actions workflows
 .harness/     planning, research, handover, and operating rules
-data/         curated source registry and future static data
-ingestion/    Python ingestion, cleanup, enrichment contracts, prompts
+data/         curated source registry and geospatial seed data
+ingestion/    Python ingestion, enrichment, cleanup, prompts, models
 supabase/     SQL migrations and seed data
-tmp/          local runtime artifacts such as ingestion snapshots
+tmp/          local runtime artifacts such as ingestion and enrichment snapshots
 web/          Next.js frontend application
 README.md     repo overview
 ```
@@ -46,11 +46,15 @@ Purpose:
 - curated source registry for the POC
 - source metadata used by ingestion
 
-Current expectations:
+### `data/geo/country_centroids.json`
 
-- contains source identity, type, feed URL, and reliability information
-- includes enabled and disabled sources
-- drives which feeds are polled
+Purpose:
+
+- early country-level geospatial assignment for enriched events
+
+Current limitation:
+
+- this is country-centroid quality, not true facility or city-quality geocoding
 
 ## 4. `ingestion/`
 
@@ -59,8 +63,8 @@ Purpose:
 - feed polling
 - normalization
 - dedupe
+- event enrichment
 - retention cleanup
-- enrichment contract scaffolding
 
 Key files:
 
@@ -73,8 +77,16 @@ Key files:
   - skips hashes already present in Supabase
   - writes ingestion snapshot artifact
 
+- `enrich_events.py`
+  - first live article-to-event enrichment job
+  - processes `pending` articles
+  - creates `events`, `event_locations`, and `event_articles`
+  - marks articles as `evented`, `no_event`, or `error`
+  - writes enrichment snapshot artifact
+  - current public extraction version is `heuristic_v2`
+
 - `cleanup_supabase.py`
-  - calls the Supabase retention RPC after ingest
+  - calls the Supabase retention RPC after ingest and enrichment
 
 - `models.py`
   - Python-side structured models for enrichment work
@@ -84,10 +96,6 @@ Key files:
 
 - `requirements.txt`
   - Python dependencies for Actions
-
-Current gap:
-
-- there is still no production article-to-event enrichment job
 
 ## 5. `supabase/`
 
@@ -104,13 +112,20 @@ Key files:
 
 - `20260608_001_initial_schema.sql`
   - core schema
-  - includes industries, subsectors, sources, articles, events, locations, joins, and summaries
 
 - `20260608_002_ingest_api_policies.sql`
   - ingest-related RLS and token-gated write path
 
 - `20260608_003_ingest_maintenance.sql`
   - retention cleanup RPC for old articles
+
+- `20260610_004_event_enrichment_path.sql`
+  - enrichment state columns
+  - token-gated write path for enrichment-related tables
+
+- `20260610_005_public_event_rpc.sql`
+  - narrow public event read function
+  - current safe read path for the frontend
 
 ### `supabase/seeds/`
 
@@ -127,8 +142,9 @@ Live project state:
 
 - project name: `industrymapper`
 - project ref: `uwfpjwlkypryqhfmbybj`
-- runtime tables intentionally reset on `2026-06-08`
-- seeded reference tables preserved
+- `articles` are populated
+- `heuristic_v2` events are populated and visible through the RPC
+- a smaller exploratory `heuristic_v1` batch still exists in the raw events table but is intentionally hidden from the app
 
 ## 6. `.github/workflows/`
 
@@ -145,8 +161,9 @@ Current behavior:
 3. validate required secret presence
 4. install dependencies
 5. run `ingestion/ingest_sources.py`
-6. run `ingestion/cleanup_supabase.py`
-7. upload ingestion artifact
+6. run `ingestion/enrich_events.py`
+7. run `ingestion/cleanup_supabase.py`
+8. upload ingestion and enrichment artifacts
 
 Current schedule:
 
@@ -165,29 +182,31 @@ Purpose:
 Key files:
 
 - `src/app/page.tsx`
-  - current landing/product shell
+  - current live event console
+  - server-rendered list and detail flow
+  - URL-addressable industry and severity filters
 
-- `src/app/layout.tsx`
-  - root layout
+- `src/app/api/events/route.ts`
+  - API wrapper for live public event listing
 
-- `src/app/globals.css`
-  - global styles
+- `src/app/api/bootstrap/route.ts`
+  - bootstrap route for reference tables and sources
 
 - `src/app/api/health/route.ts`
   - health endpoint
 
-- `src/app/api/bootstrap/route.ts`
-  - bootstrap route scaffold
+- `src/lib/events.ts`
+  - helper for calling the public event RPC
 
 - `src/lib/supabase/server.ts`
   - server-side Supabase client setup
 
-- `src/lib/supabase/types.ts`
-  - Supabase-related TypeScript typing scaffold
+- `src/lib/site.ts`
+  - scope and severity constants used by the app shell
 
-Current gap:
+Current limitation:
 
-- frontend is scaffolded, not yet connected to live `events`
+- the app is now live against real events, but it is not a true map UI yet
 
 ## 8. Current Product State
 
@@ -198,28 +217,29 @@ What is already real:
 - schema is applied
 - seeds are applied
 - ingest pipeline runs
+- enrichment pipeline runs
 - retention cleanup runs
 - pre-insert article dedupe exists
-- frontend shell exists
+- narrow public event RPC exists
+- frontend event console exists
 
 What is not done yet:
 
-- article-to-event extraction
-- geocoded event creation
-- public event query path
-- real event map rendering
+- stronger event-quality controls
+- legacy `heuristic_v1` cleanup
+- better location quality than country centroids
+- actual map rendering
 - weekly summary generation
 
 ## 9. Next Model Priorities
 
 If another model takes over, the correct next order is:
 
-1. confirm the improved ingest workflow is repopulating `articles`
-2. build the first enrichment job from `articles` to `events`
-3. define the first canonical event extraction payload
-4. add geocoding or location assignment logic
-5. expose safe read-path event queries
-6. wire the frontend to live event data
+1. improve event extraction quality and reduce false positives
+2. decide whether to delete legacy `heuristic_v1` rows
+3. improve geospatial assignment
+4. build the first real map layer on top of `list_public_events`
+5. add weekly summary generation
 
 ## 10. Things The Next Model Should Not Redesign
 
@@ -227,4 +247,5 @@ If another model takes over, the correct next order is:
 - do not replace Python ingestion with TypeScript
 - do not replace the locked `0-5` severity model
 - do not remove `event_articles`
+- do not broaden public data exposure casually
 - do not add paid infrastructure without explicit user approval
