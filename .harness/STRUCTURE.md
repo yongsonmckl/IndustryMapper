@@ -143,8 +143,9 @@ Live project state:
 - project name: `industrymapper`
 - project ref: `uwfpjwlkypryqhfmbybj`
 - `articles` are populated
+- current article enrichment state: `14 evented`, `12 pending`, `107 no_event`
 - `heuristic_v2` events are populated and visible through the RPC
-- a smaller exploratory `heuristic_v1` batch still exists in the raw events table but is intentionally hidden from the app
+- `heuristic_v1` rows have already been removed
 
 ## 6. `.github/workflows/`
 
@@ -226,7 +227,7 @@ What is already real:
 What is not done yet:
 
 - stronger event-quality controls
-- legacy `heuristic_v1` cleanup
+- processing the remaining pending articles
 - better location quality than country centroids
 - actual map rendering
 - weekly summary generation
@@ -236,12 +237,27 @@ What is not done yet:
 If another model takes over, the correct next order is:
 
 1. improve event extraction quality and reduce false positives
-2. decide whether to delete legacy `heuristic_v1` rows
+2. process the remaining pending articles
 3. improve geospatial assignment
 4. build the first real map layer on top of `list_public_events`
 5. add weekly summary generation
 
-## 10. Things The Next Model Should Not Redesign
+## 10. Refinement Guidance
+
+The next model should not broadly revisit earlier phases.
+
+Refine now:
+
+- `Phase 3` event extraction quality
+- `Phase 4` geospatial and event-surface quality
+
+Leave for later:
+
+- broad cleanup of `Phase 0-2`
+- non-essential ingestion refactors
+- general polish unrelated to event quality
+
+## 11. Things The Next Model Should Not Redesign
 
 - do not split industries into separate Supabase projects
 - do not replace Python ingestion with TypeScript

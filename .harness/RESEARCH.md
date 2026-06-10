@@ -142,6 +142,7 @@ Current live fix:
 - single-token keyword matching now uses word boundaries
 - generic product-introduction wording was removed from event creation
 - `heuristic_v2` is the current public extraction version
+- the older exploratory `heuristic_v1` derived rows have been deleted
 
 ### 3. Early geospatial assignment is acceptable through country centroids
 
@@ -152,6 +153,18 @@ It is not sufficient for final map quality, but it is enough to:
 - show the first geography-aware events
 - support a first event console
 - prove the article-to-event-to-location flow
+
+### 4. Refinement should target quality bottlenecks, not old phases in general
+
+At the current project stage, the limiting factor is event quality rather than planning or raw ingestion setup.
+
+That means:
+
+- refinement should focus on enrichment quality first
+- then geospatial quality
+- then map-readiness
+
+It does not make sense to spend time broadly polishing earlier phases unless they directly improve the quality of the event layer.
 
 ## Public Read Path Research Updates
 

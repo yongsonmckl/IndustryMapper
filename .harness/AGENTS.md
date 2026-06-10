@@ -30,17 +30,17 @@ Current live foundation:
 Current runtime state as of `2026-06-10`:
 
 - `133` articles have been ingested
-- enrichment has processed the current article backlog
-- `26` articles are marked `evented`
+- enrichment has processed most of the current article backlog
+- `14` articles are marked `evented`
+- `12` articles are marked `pending`
 - `107` articles are marked `no_event`
 - `14` `heuristic_v2` events are currently exposed through the safe public read path
 
 Important operational note:
 
 - Runtime data was intentionally reset on `2026-06-08`
-- A first exploratory `heuristic_v1` event batch still exists in the database
-- The app and public RPC are deliberately filtered to `heuristic_v2` only
-- Removing the old `heuristic_v1` derived rows is a separate destructive cleanup decision
+- The old exploratory `heuristic_v1` derived rows have been deleted
+- The app and public RPC read `heuristic_v2` only
 
 ## Current Source of Truth
 
@@ -330,11 +330,33 @@ Owns:
 The foundation is now far enough along to move in this order:
 
 1. improve event extraction quality and false-positive controls
-2. decide whether to wipe legacy `heuristic_v1` derived rows
+2. process the remaining `12` pending articles with the current or improved extractor
 3. add canonical coordinate coverage beyond country centroids
 4. build the actual map layer on top of the existing event RPC
 5. add weekly summary generation
 6. harden QA and observability
+
+## Refinement Rule
+
+Do not broadly revisit earlier phases right now.
+
+Current refinement priority:
+
+- refine only work that directly improves event quality
+- refine only work that directly improves geospatial quality
+- refine only work that directly improves map-readiness
+
+What should be refined now:
+
+- `Phase 3` enrichment quality
+- `Phase 4` geospatial accuracy and map-readiness
+
+What should wait until later:
+
+- broad cleanup across `Phase 0-2`
+- major ingestion refactors that do not improve event quality
+- generalized polish work
+- weekly-summary refinement before the event layer is more trustworthy
 
 ## Non-Negotiables
 

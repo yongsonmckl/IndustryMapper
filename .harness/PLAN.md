@@ -44,15 +44,16 @@ Implemented foundation:
 Current runtime state as of `2026-06-10`:
 
 - `133` articles ingested
-- `26` articles classified as event-bearing
+- `14` articles classified as event-bearing
+- `12` articles still pending enrichment
 - `107` articles classified as no-event
 - `14` `heuristic_v2` events exposed to the app
 
 Important current state:
 
 - runtime data was reset intentionally on `2026-06-08`
-- a first exploratory `heuristic_v1` event batch still exists in the database
-- the current app surface intentionally filters to `heuristic_v2`
+- the old exploratory `heuristic_v1` event batch has already been deleted
+- the current app surface reads `heuristic_v2`
 
 ## 4. Current Architecture
 
@@ -168,7 +169,7 @@ The event path is live, but the current extraction logic is still conservative h
 
 ### 8.2 Risk: legacy exploratory derived rows still exist
 
-The app hides `heuristic_v1`, but those rows still exist in the database until explicit destructive cleanup is approved.
+This risk is now cleared. `heuristic_v1` rows have been deleted.
 
 ### 8.3 Risk: location coverage is still shallow
 
@@ -264,13 +265,29 @@ Status: not started beyond schema support.
 The best next sequence from the current state is:
 
 1. improve enrichment quality and remove obvious false positives
-2. decide whether to wipe legacy `heuristic_v1` derived rows
+2. process the remaining `12` pending articles
 3. improve geospatial assignment beyond country centroids
 4. build the first real map surface on top of the existing event RPC
 5. add weekly summary generation
 6. harden observability around enrichment drift
 
-## 11. Foundation Rules That Should Not Change
+## 11. Refinement Policy
+
+Do not broadly refine earlier phases right now.
+
+The correct strategy is selective refinement:
+
+- refine `Phase 3` where event extraction quality is weak
+- refine `Phase 4` where geospatial or event-surface quality is weak
+
+Leave these for later unless they become blockers:
+
+- broad cleanup across `Phase 0`, `Phase 1`, or `Phase 2`
+- major ingestion refactors that do not materially improve event quality
+- polish passes that do not improve event trustworthiness
+- deeper weekly-summary work before the event layer is stronger
+
+## 12. Foundation Rules That Should Not Change
 
 - Keep one Supabase project for this product for now
 - Add more industries within the same schema, not separate projects
@@ -279,7 +296,7 @@ The best next sequence from the current state is:
 - Treat events, not articles, as the core product object
 - Prefer narrow RPC exposure over broad anonymous table reads
 
-## 12. Definition of the Next Meaningful Milestone
+## 13. Definition of the Next Meaningful Milestone
 
 The next milestone is now:
 
