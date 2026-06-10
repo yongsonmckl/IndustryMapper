@@ -24,6 +24,7 @@ Current live foundation:
 - Supabase ref: `uwfpjwlkypryqhfmbybj`
 - Supabase URL: `https://uwfpjwlkypryqhfmbybj.supabase.co`
 - Frontend app exists in `web/`
+- Homepage, Map, and About routes now exist
 - Ingestion and enrichment runtime exists in `ingestion/`
 - Scheduled workflow exists in `.github/workflows/ingest-sources.yml`
 
@@ -245,6 +246,7 @@ Current public read pattern:
 
 - do not expose raw event tables broadly
 - expose live product data through a narrow public RPC
+- expose `no_event` headlines through a separate narrow public briefing RPC rather than raw article reads
 
 ## Frontend Architecture Rules
 
@@ -253,7 +255,7 @@ Current public read pattern:
 - Keep filters URL-addressable where practical
 - Keep map interaction state close to the map UI
 - Build around real Supabase-backed data contracts, not long-lived mocks
-- Treat the current map implementation in `web/src/components/event-console.tsx` as the baseline, not a prototype to discard
+- Treat the current map implementation in `web/src/components/map-explorer.tsx` as the baseline, not a prototype to discard
 
 ## Agent Roster
 
@@ -340,9 +342,10 @@ The foundation is now far enough along to move in this order:
 1. review recent `no_event` articles for false negatives under `heuristic_v3`
 2. add broader canonical coordinate coverage beyond the current alias set
 3. harden dense-area marker overlap and clustering behavior
-4. add repeatable QA and observability around enrichment drift
-5. add weekly summary generation
-6. address broader Supabase security/config warnings when product priorities allow
+4. separate neutral intelligence from discarded noise before summary automation
+5. add repeatable QA and observability around enrichment drift
+6. add weekly summary generation
+7. address broader Supabase security/config warnings when product priorities allow
 
 ## Refinement Rule
 

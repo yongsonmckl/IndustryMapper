@@ -189,6 +189,7 @@ Why this is better right now:
 Current live implementation note:
 
 - the app now defaults to `heuristic_v3` only through the public RPC path
+- the frontend now also reads a safe public `no_event` headline list through a separate briefing RPC
 
 ## Infrastructure Research Updates
 
@@ -252,3 +253,21 @@ Research implication:
 
 - the immediate question is no longer false-positive control alone
 - the next question is whether event recall has become too strict
+
+## Product Surface Update
+
+As of `2026-06-10`, the frontend is no longer a single event-console page.
+
+It now has:
+
+- a separate homepage
+- a separate live map page
+- a separate about page
+- a dark-mode visual system
+- a real MapLibre globe instead of the previous SVG mock
+- a separate neutral-headline card fed from live `no_event` articles
+
+Research implication:
+
+- the product has now started the bridge into the weekly-summary/newsletter phase
+- the next backend classification improvement should separate neutral intelligence from discarded noise more explicitly

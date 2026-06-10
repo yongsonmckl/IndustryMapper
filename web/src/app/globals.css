@@ -1,13 +1,19 @@
 @import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
 
 :root {
-  --color-bg: #eef3f1;
-  --color-panel: #f6f8f6;
-  --color-soft: #ecf1ef;
-  --color-ink: #10212c;
-  --color-ink-soft: #1d3645;
-  --color-muted-ink: #51626e;
-  --color-accent: #2b6f8a;
+  --color-bg: #06111d;
+  --color-panel: #0d1b2a;
+  --color-panel-strong: #102238;
+  --color-soft: #132740;
+  --color-soft-border: rgba(141, 173, 214, 0.14);
+  --color-ink: #eef6ff;
+  --color-ink-soft: #c6d8ef;
+  --color-muted-ink: #87a1bf;
+  --color-accent: #4c8fd9;
+  --color-accent-soft: #9bc6ff;
+  --color-success: #59d69a;
+  --color-shadow: rgba(1, 8, 18, 0.45);
 }
 
 @theme inline {
@@ -27,9 +33,9 @@ html {
 
 body {
   background:
-    radial-gradient(circle at top left, rgba(43, 111, 138, 0.12), transparent 32%),
-    radial-gradient(circle at top right, rgba(200, 129, 52, 0.12), transparent 22%),
-    linear-gradient(180deg, #f3f6f5 0%, #e8eeeb 100%);
+    radial-gradient(circle at top left, rgba(76, 143, 217, 0.18), transparent 28%),
+    radial-gradient(circle at top right, rgba(38, 86, 146, 0.18), transparent 24%),
+    linear-gradient(180deg, #07121e 0%, #091827 54%, #07111b 100%);
   color: var(--color-ink);
   font-family: "Avenir Next", "Segoe UI", sans-serif;
 }
@@ -40,5 +46,27 @@ button {
 }
 
 ::selection {
-  background: rgba(43, 111, 138, 0.18);
+  background: rgba(76, 143, 217, 0.25);
+}
+
+.maplibregl-ctrl-group {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(8, 17, 29, 0.92);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.maplibregl-ctrl button .maplibregl-ctrl-icon {
+  filter: invert(1) opacity(0.88);
+}
+
+.maplibregl-popup-content {
+  border-radius: 1rem;
+  background: #102238;
+  color: #eef6ff;
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.45);
+}
+
+.maplibregl-popup-tip {
+  border-top-color: #102238 !important;
+  border-bottom-color: #102238 !important;
 }

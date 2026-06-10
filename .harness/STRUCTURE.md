@@ -149,6 +149,9 @@ Key files:
   - RPC default extraction version update
   - performance indexes
 
+- `20260610_009_public_briefing_articles.sql`
+  - safe public RPC for live `no_event` headline surfacing
+
 ### `supabase/seeds/`
 
 Key files:
@@ -205,18 +208,29 @@ Purpose:
 Key files:
 
 - `src/app/page.tsx`
-  - current live event console shell
-  - server-rendered initial data load
+  - current homepage
+  - live event and neutral-headline preview surface
 
-- `src/components/event-console.tsx`
-  - live client-side event console and map surface
+- `src/app/map/page.tsx`
+  - server-rendered map page shell
+  - initial live data load for the globe experience
+
+- `src/app/about/page.tsx`
+  - product and architecture explainer page
+
+- `src/components/map-explorer.tsx`
+  - live client-side globe map surface
   - severity-colored markers
   - URL-addressable filters
   - viewport-aware event loading
   - event selection and detail flow
+  - neutral-headline card and modal for `no_event` articles
 
 - `src/app/api/events/route.ts`
   - API wrapper for live public event listing
+
+- `src/app/api/briefings/route.ts`
+  - API wrapper for safe public `no_event` headline listing
 
 - `src/app/api/bootstrap/route.ts`
   - bootstrap route for reference tables and sources
@@ -252,8 +266,10 @@ What is already real:
 - narrow public event RPC exists
 - frontend event console exists
 - live map surface exists
+- separated homepage and about pages exist
 - viewport-driven event loading exists
 - canonical-location viewport filtering is fixed
+- live `no_event` headline surface exists
 
 What is not done yet:
 
@@ -270,7 +286,8 @@ If another model takes over, the correct next order is:
 2. measure false negatives across recent `no_event` articles
 3. improve geospatial assignment coverage
 4. polish clustering and dense-area map interaction
-5. add weekly summary generation
+5. split neutral intelligence from discarded noise more explicitly
+6. add weekly summary generation
 
 ## 10. Refinement Guidance
 

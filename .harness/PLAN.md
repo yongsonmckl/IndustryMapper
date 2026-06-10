@@ -38,8 +38,9 @@ Implemented foundation:
 - GitHub Actions workflow exists and runs
 - retention cleanup exists and runs
 - event enrichment exists and runs
-- a Next.js frontend event console exists
+- a Next.js homepage, map page, and about page exist
 - a narrow public event RPC exists
+- a public `no_event` briefing RPC exists
 
 Current runtime state as of `2026-06-10`:
 
@@ -66,6 +67,7 @@ Important current state:
 - `Tailwind CSS`
 - app lives in `web/`
 - live route reads through a narrow public RPC, not raw table reads
+- current UI is dark-mode and route-separated into `Home`, `Map`, and `About`
 
 ### Ingestion and enrichment
 
@@ -255,14 +257,20 @@ Status: baseline implementation complete.
 Delivered:
 
 - live event RPC
+- live neutral-headline RPC
 - event API route
+- neutral-headline API route
 - server-rendered event console
 - live map renderer
+- real MapLibre globe renderer
 - severity-colored markers
 - industry and severity filters
 - event detail surface
 - viewport-driven loading
 - URL-addressable filter state
+- persistent header/footer navigation
+- separated `Home`, `Map`, and `About` routes
+- clickable `no_event` headline card with detail modal
 
 Still needed:
 
@@ -272,7 +280,7 @@ Still needed:
 
 ### Phase 5: Weekly Intelligence Layer
 
-Status: not started beyond schema support.
+Status: first bridge work has started through public neutral-headline surfacing, but summary generation is not implemented.
 
 ## 10. Immediate Next Steps
 
@@ -281,9 +289,10 @@ The best next sequence from the current state is:
 1. review recent `no_event` articles to measure `heuristic_v3` false negatives
 2. improve location resolution coverage for plant, port, city, and state mentions
 3. harden map interaction for dense marker overlap and clustering
-4. add a lightweight evaluation and drift-reporting path after each enrichment run
-5. add weekly summary generation
-6. address broader Supabase security advisor warnings when product work allows
+4. split `no_event` into a more useful neutral-intelligence taxonomy before weekly summary generation
+5. add a lightweight evaluation and drift-reporting path after each enrichment run
+6. add weekly summary generation
+7. address broader Supabase security advisor warnings when product work allows
 
 ## 11. Refinement Policy
 
