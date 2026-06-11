@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
           : null,
       extractionMethods: extractionMethodsParam
         ? extractionMethodsParam.split(",").filter(Boolean)
-        : ["heuristic_v3"],
+        : ["heuristic_v4", "heuristic_v3"],
     });
 
     return NextResponse.json({ events });

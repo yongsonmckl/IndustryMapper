@@ -56,3 +56,11 @@ class EventCandidate:
     signal_score: float = 0.0
     drop_reason: str | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class EnrichmentDecision:
+    article_status: str
+    outcome_reason: str
+    candidate: EventCandidate | None = None
+    review_notes: list[str] = field(default_factory=list)

@@ -43,7 +43,7 @@ export default async function MapPage({ searchParams }: { searchParams: SearchPa
       eventType: resolvedSearchParams.eventType,
       minSeverity: Number.isFinite(severityNumber) ? severityNumber : null,
       limit: 80,
-      extractionMethods: ["heuristic_v3"],
+      extractionMethods: ["heuristic_v4", "heuristic_v3"],
     }),
     listPublicBriefings({
       industry: resolvedSearchParams.industry,

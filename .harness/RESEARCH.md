@@ -130,7 +130,8 @@ A large share of industry articles are informative but not map-worthy operationa
 
 The current live pipeline therefore filters aggressively:
 
-- many articles are classified as `no_event`
+- many articles are classified as `neutral_intelligence`
+- obvious noise is classified as `discarded`
 - only a smaller subset are converted into event objects
 
 ### 2. Substring keyword matching is too loose
@@ -144,7 +145,8 @@ Current live fix:
 - generic investment language is no longer enough on its own to create an event
 - event creation now requires stronger concrete anchors for investment, conflict, labor, and policy cases
 - event-level dedupe now prevents multiple near-identical articles from creating duplicate product rows
-- `heuristic_v3` is the current public extraction version
+- article outcomes are now split into `evented`, `neutral_intelligence`, `discarded`, and `error`
+- `heuristic_v4` is the current public extraction version
 - the older exploratory `heuristic_v1` derived rows have been deleted
 
 ### 3. Geospatial assignment has moved beyond pure country centroids, but is still incomplete
@@ -160,6 +162,7 @@ It is still not sufficient for final map quality, but it is enough to:
 Current limitation:
 
 - plant, port, city, and state resolution coverage still needs to expand
+- title/summary ranking helps, but multi-country stories can still resolve to the wrong place if the best facility or city alias is missing
 
 ### 4. Refinement should target quality bottlenecks, not old phases in general
 
@@ -188,8 +191,9 @@ Why this is better right now:
 
 Current live implementation note:
 
-- the app now defaults to `heuristic_v3` only through the public RPC path
-- the frontend now also reads a safe public `no_event` headline list through a separate briefing RPC
+- the app now defaults to `heuristic_v4` with `heuristic_v3` fallback through the public RPC path
+- the frontend now also reads a safe public neutral-headline list through a separate briefing RPC
+- legacy `no_event` briefing compatibility is still intentionally preserved on the SQL side
 
 ## Infrastructure Research Updates
 
@@ -237,22 +241,24 @@ Locked for the first POC:
 7. Retention strategy: automated `14` day article retention
 8. Dedupe strategy: pre-insert canonical article selection
 9. Event dedupe strategy: prevent duplicate event creation across overlapping article coverage
-10. Current public event version: `heuristic_v3`
+10. Current public event version: `heuristic_v4`
 
 ## Current Runtime Quality Snapshot
 
 As of `2026-06-10`, after the live rebuild:
 
 - `151` recent articles are present
-- `7` articles are currently `evented`
-- `144` articles are currently `no_event`
+- `15` articles are currently `evented`
+- `124` articles are currently `neutral_intelligence`
+- `12` articles are currently `discarded`
 - `0` articles are currently `pending`
-- the public app surface shows `7` live `heuristic_v3` events
+- the public app surface shows `15` live `heuristic_v4` events
 
 Research implication:
 
 - the immediate question is no longer false-positive control alone
 - the next question is whether event recall has become too strict
+- article and event counts should still be checked after broad rebuilds because reclassification can strand stale event rows without an automatic cleanup pass
 
 ## Product Surface Update
 
@@ -265,9 +271,9 @@ It now has:
 - a separate about page
 - a dark-mode visual system
 - a real MapLibre globe instead of the previous SVG mock
-- a separate neutral-headline card fed from live `no_event` articles
+- a separate neutral-headline card fed from live neutral-intelligence articles
 
 Research implication:
 
 - the product has now started the bridge into the weekly-summary/newsletter phase
-- the next backend classification improvement should separate neutral intelligence from discarded noise more explicitly
+- the next backend quality step is broader false-negative review and wider geospatial alias coverage, not a fresh taxonomy split

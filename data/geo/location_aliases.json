@@ -10,6 +10,16 @@
     "precision": "state"
   },
   {
+    "name": "Permian Basin",
+    "aliases": ["permian basin", "permian"],
+    "latitude": 31.7314,
+    "longitude": -103.6168,
+    "country_iso3": "USA",
+    "admin1": "Texas",
+    "location_role": "affected_area",
+    "precision": "region"
+  },
+  {
     "name": "Louisiana",
     "aliases": ["louisiana"],
     "latitude": 30.9843,
@@ -46,6 +56,16 @@
     "country_iso3": "SAU",
     "location_role": "affected_area",
     "precision": "sea"
+  },
+  {
+    "name": "Al-Azraq Air Base",
+    "aliases": ["al-azraq air base", "azraq air base", "al-azraq", "azraq"],
+    "latitude": 31.8328,
+    "longitude": 36.782,
+    "country_iso3": "JOR",
+    "city": "Azraq",
+    "location_role": "facility",
+    "precision": "facility"
   },
   {
     "name": "Suez Canal",
@@ -191,6 +211,16 @@
     "city": "Boise",
     "location_role": "facility",
     "precision": "city"
+  },
+  {
+    "name": "Idaho",
+    "aliases": ["idaho"],
+    "latitude": 44.0682,
+    "longitude": -114.742,
+    "country_iso3": "USA",
+    "admin1": "Idaho",
+    "location_role": "affected_area",
+    "precision": "state"
   },
   {
     "name": "Dresden",

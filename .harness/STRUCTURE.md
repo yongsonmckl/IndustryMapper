@@ -64,7 +64,7 @@ Purpose:
 
 Current limitation:
 
-- coverage is still selective, not a full global resolver
+- coverage is still selective, not a full global resolver, but live aliases now include targeted state, region, city, and facility upgrades used by `heuristic_v4`
 
 ## 4. `ingestion/`
 
@@ -89,12 +89,13 @@ Key files:
 
 - `enrich_events.py`
   - live article-to-event enrichment job
-  - processes `pending` articles
+  - processes `pending` articles and can reprocess existing article states through env flags
   - creates `events`, `event_locations`, and `event_articles`
-  - marks articles as `evented`, `no_event`, or retryable `error`
+  - marks articles as `evented`, `neutral_intelligence`, `discarded`, or retryable `error`
   - writes enrichment snapshot artifact
-  - current public extraction version is `heuristic_v3`
-  - includes event-level dedupe, stronger confidence gates, and canonical location resolution
+  - current public extraction version is `heuristic_v4`
+  - includes event-level dedupe, stronger confidence gates, richer outcome logging, and canonical location refresh logic
+  - important rebuild caveat: article reclassification does not implicitly garbage-collect stale `events` rows, so event/article consistency should be checked after broad reprocess runs
 
 - `cleanup_supabase.py`
   - calls the Supabase retention RPC after ingest and enrichment
@@ -150,7 +151,11 @@ Key files:
   - performance indexes
 
 - `20260610_009_public_briefing_articles.sql`
-  - safe public RPC for live `no_event` headline surfacing
+  - original safe public briefing RPC for live neutral headline surfacing
+
+- `20260610_010_enrichment_taxonomy_and_briefings.sql`
+  - adds `articles.enrichment_outcome_reason`
+  - updates public briefings to read `neutral_intelligence` plus legacy `no_event`
 
 ### `supabase/seeds/`
 
@@ -168,9 +173,15 @@ Live project state:
 - project name: `industrymapper`
 - project ref: `uwfpjwlkypryqhfmbybj`
 - `articles` are populated
-- current article enrichment state: `7 evented`, `0 pending`, `144 no_event`
-- `heuristic_v3` events are populated and visible through the RPC
+- current article enrichment state: `15 evented`, `124 neutral_intelligence`, `12 discarded`, `0 pending`, `0 error`
+- `heuristic_v4` events are populated and visible through the RPC
 - low-quality earlier event rows were removed during the quality rebuild
+
+Live rebuild caveats that matter for handoff:
+
+- one stale event row had to be deleted manually after its article was demoted from `evented` to `neutral_intelligence`
+- canonical location refresh initially failed on the one-canonical-location constraint until the old canonical row was unset first
+- public briefings intentionally still accept legacy `no_event` rows for compatibility, even though the current taxonomy uses `neutral_intelligence`
 
 ## 6. `.github/workflows/`
 
@@ -224,13 +235,13 @@ Key files:
   - URL-addressable filters
   - viewport-aware event loading
   - event selection and detail flow
-  - neutral-headline card and modal for `no_event` articles
+  - neutral-headline card and modal for neutral-intelligence articles
 
 - `src/app/api/events/route.ts`
   - API wrapper for live public event listing
 
 - `src/app/api/briefings/route.ts`
-  - API wrapper for safe public `no_event` headline listing
+  - API wrapper for safe public neutral-intelligence headline listing
 
 - `src/app/api/bootstrap/route.ts`
   - bootstrap route for reference tables and sources
@@ -250,6 +261,7 @@ Key files:
 Current limitation:
 
 - the app is now a true map UI, but dense-area overlap and clustering still need polish
+- the app fetch path is backward-compatible across `heuristic_v4` and `heuristic_v3`, so a future cleanup should be careful not to break old data reads prematurely
 
 ## 8. Current Product State
 
@@ -269,7 +281,7 @@ What is already real:
 - separated homepage and about pages exist
 - viewport-driven event loading exists
 - canonical-location viewport filtering is fixed
-- live `no_event` headline surface exists
+- live neutral-intelligence headline surface exists
 
 What is not done yet:
 
@@ -277,17 +289,17 @@ What is not done yet:
 - broader plant, port, city, and state location coverage
 - clustering and dense-marker overlap polish
 - weekly summary generation
+- a fully automated stale-event cleanup path when previously evented articles are later demoted
 
 ## 9. Next Model Priorities
 
 If another model takes over, the correct next order is:
 
 1. improve event extraction quality and reduce false negatives
-2. measure false negatives across recent `no_event` articles
+2. measure false negatives across recent `neutral_intelligence` articles
 3. improve geospatial assignment coverage
 4. polish clustering and dense-area map interaction
-5. split neutral intelligence from discarded noise more explicitly
-6. add weekly summary generation
+5. add weekly summary generation
 
 ## 10. Refinement Guidance
 

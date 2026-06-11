@@ -51,7 +51,7 @@ export async function listPublicEvents(filters?: {
     viewport_min_lat: filters?.viewport?.minLat ?? null,
     viewport_max_lng: filters?.viewport?.maxLng ?? null,
     viewport_max_lat: filters?.viewport?.maxLat ?? null,
-    filter_extraction_methods: filters?.extractionMethods ?? ["heuristic_v3"],
+    filter_extraction_methods: filters?.extractionMethods ?? ["heuristic_v4", "heuristic_v3"],
   });
 
   if (error) {

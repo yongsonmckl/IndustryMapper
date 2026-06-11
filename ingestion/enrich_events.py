@@ -12,7 +12,7 @@ from typing import Any
 import requests
 from requests import RequestException
 
-from models import EventCandidate, EventLocationCandidate
+from models import EnrichmentDecision, EventCandidate, EventLocationCandidate
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,9 +21,19 @@ LOCATION_ALIASES_PATH = ROOT / "data" / "geo" / "location_aliases.json"
 ARTIFACT_DIR = ROOT / "tmp" / "enrichment"
 TIMEOUT_SECONDS = 30
 ARTICLE_BATCH_SIZE = int(os.getenv("EVENT_ENRICH_BATCH_SIZE", "40"))
-MIN_SIGNAL_SCORE = float(os.getenv("EVENT_ENRICH_MIN_SIGNAL_SCORE", "2.6"))
-MIN_EVENT_CONFIDENCE = float(os.getenv("EVENT_ENRICH_MIN_CONFIDENCE", "0.78"))
+MIN_SIGNAL_SCORE = float(os.getenv("EVENT_ENRICH_MIN_SIGNAL_SCORE", "2.9"))
+MIN_EVENT_CONFIDENCE = float(os.getenv("EVENT_ENRICH_MIN_CONFIDENCE", "0.8"))
 MAX_RETRYABLE_ATTEMPTS = int(os.getenv("EVENT_ENRICH_MAX_RETRYABLE_ATTEMPTS", "3"))
+ENRICHMENT_VERSION = os.getenv("EVENT_ENRICH_VERSION", "heuristic_v4")
+REPROCESS_EXISTING = os.getenv("EVENT_ENRICH_REPROCESS_EXISTING", "0").lower() in {"1", "true", "yes"}
+REPROCESS_STATUSES = tuple(
+    status.strip()
+    for status in os.getenv(
+        "EVENT_ENRICH_REPROCESS_STATUSES",
+        "no_event,neutral_intelligence,discarded",
+    ).split(",")
+    if status.strip()
+)
 
 STRIP_TAGS_RE = re.compile(r"<[^>]+>")
 SPACE_RE = re.compile(r"\s+")
@@ -35,19 +45,31 @@ EVENT_TYPE_PATTERNS: dict[str, tuple[str, ...]] = {
     "import-ban": ("import ban", "imports banned", "banned imports", "ban on imports"),
     "tariff": ("tariff", "duties", "import levy", "trade duty"),
     "sanction": ("sanction", "blacklist", "embargo", "restricted party"),
-    "factory-shutdown": ("shutdown", "halts production", "production halt", "outage", "offline", "fab outage", "plant outage", "idle"),
+    "factory-shutdown": ("shutdown", "halts production", "production halt", "outage", "offline", "fab outage", "plant outage", "idle", "shut off wells", "shut in wells", "shut in"),
     "port-disruption": ("port disruption", "port closed", "shipping disruption", "terminal disruption", "vessel delays", "shipping bottleneck"),
     "pipeline-disruption": ("pipeline disruption", "pipeline outage", "pipeline leak", "pipeline shutdown", "pipeline fire"),
-    "labor-strike": ("strike", "walkout", "labor action", "industrial action"),
-    "policy-change": ("policy", "regulation", "rulemaking", "mandate", "licensing regime", "ministerial order", "strategy"),
+    "labor-strike": ("strike", "striking", "walkout", "labor action", "industrial action", "pay dispute", "workers striking"),
+    "policy-change": ("policy change", "regulation", "rulemaking", "mandate", "licensing regime", "ministerial order", "strategy", "chips act", "new rule", "boost production", "cut production", "production increase", "production cuts", "output increase", "output cuts"),
     "supply-shortage": ("shortage", "allocation", "tight supply", "supply crunch", "scarcity"),
     "investment-announcement": (
         "final investment decision",
         "fid",
         "starts up",
         "startup",
+        "starts production",
+        "start production",
+        "begins production",
+        "begins operations",
         "proceed with",
         "funding reaches",
+        "investment",
+        "investing",
+        "raises funding",
+        "secures agreements",
+        "approves project",
+        "greenlights",
+        "build oil reserve",
+        "stockpile",
         "commissioning",
         "commissioned",
         "new plant",
@@ -58,26 +80,36 @@ EVENT_TYPE_PATTERNS: dict[str, tuple[str, ...]] = {
         "bring online",
     ),
     "accident-disaster": ("fire", "explosion", "spill", "earthquake", "flood", "accident", "storm", "blast"),
-    "conflict-disruption": ("war", "conflict", "missile", "attack", "blockade", "drone strike"),
+    "conflict-disruption": ("war", "conflict", "missile", "attack", "blockade", "drone strike", "air strike", "retaliatory", "fires back", "downed"),
+}
+
+EVENT_TYPE_CONTEXT_TERMS: dict[str, tuple[str, ...]] = {
+    "factory-shutdown": ("plant", "facility", "production", "output", "fab", "refinery", "terminal", "well", "basin"),
+    "port-disruption": ("port", "terminal", "shipping", "vessel", "cargo", "export"),
+    "pipeline-disruption": ("pipeline", "gas", "oil", "crude", "flow", "supply"),
+    "labor-strike": ("workers", "union", "pay", "operations", "offshore", "plant"),
+    "policy-change": ("government", "ministry", "commission", "law", "industry", "strategy", "opec", "output", "production"),
+    "investment-announcement": ("project", "plant", "fab", "facility", "terminal", "production", "capacity", "funding", "reserve", "stockpile"),
+    "conflict-disruption": ("oil", "gas", "shipping", "supply", "market", "trade", "export"),
 }
 
 SEMICONDUCTOR_SUBSECTOR_PATTERNS: dict[str, tuple[str, ...]] = {
     "eda-ip": ("eda", "electronic design automation", "ip block", "design software", "verification ip"),
-    "fabless-design": ("chip design", "fabless", "soc", "fpga", "gpu", "cpu", "processor", "ai chip", "microcontroller"),
-    "foundry-fabrication": ("foundry", "wafer fab", "fabrication", "fab", "process node", "wafer start"),
+    "fabless-design": ("chip design", "fabless", "soc", "fpga", "gpu", "cpu", "processor", "ai chip", "microcontroller", "accelerator"),
+    "foundry-fabrication": ("foundry", "wafer fab", "fabrication", "fab", "process node", "wafer start", "leading edge", "logic production"),
     "idm": ("idm", "integrated device manufacturer", "intel", "infineon", "stmicroelectronics", "onsemi", "renesas", "ti"),
-    "equipment": ("lithography", "etch", "deposition", "metrology", "toolmaker", "equipment", "process tool", "inspection tool"),
-    "materials-wafers": ("wafer", "photoresist", "substrate", "silicon carbide", "sic", "gallium nitride", "materials", "epitaxy", "specialty gas"),
-    "packaging-test": ("packaging", "osat", "advanced packaging", "backend test", "chiplet", "assembly and test"),
+    "equipment": ("lithography", "etch", "deposition", "metrology", "toolmaker", "equipment", "process tool", "inspection tool", "wafer tool"),
+    "materials-wafers": ("wafer", "photoresist", "substrate", "silicon carbide", "sic", "gallium nitride", "materials", "epitaxy", "specialty gas", "mask blank"),
+    "packaging-test": ("packaging", "osat", "advanced packaging", "backend test", "chiplet", "assembly and test", "co-packaged optics"),
     "memory": ("dram", "nand", "hbm", "memory", "flash memory"),
 }
 
 OIL_GAS_SUBSECTOR_PATTERNS: dict[str, tuple[str, ...]] = {
     "upstream-ep": ("exploration", "production", "upstream", "offshore field", "well", "acreage", "offshore block"),
-    "oilfield-services": ("rig", "drilling", "oilfield services", "completion", "frac", "well services"),
-    "midstream": ("pipeline", "terminal", "storage", "midstream", "tanker", "shipping lane", "gathering system"),
-    "lng-gas-processing": ("lng", "liquefied natural gas", "regasification", "gas processing", "liquefaction", "export terminal"),
-    "refining": ("refinery", "refining", "crude processing", "refined products", "distillation unit"),
+    "oilfield-services": ("rig", "drilling", "oilfield services", "completion", "frac", "well services", "offshore workers", "subsea"),
+    "midstream": ("pipeline", "terminal", "storage", "midstream", "tanker", "shipping lane", "gathering system", "oil reserve", "strategic reserve"),
+    "lng-gas-processing": ("lng", "liquefied natural gas", "regasification", "gas processing", "liquefaction", "export terminal", "flng", "floating lng"),
+    "refining": ("refinery", "refining", "crude processing", "refined products", "distillation unit", "diesel"),
     "petrochemicals-ngls": ("petrochemical", "ngl", "fractionation", "ethylene", "propylene", "cracker"),
     "fuel-distribution": ("fuel marketing", "distribution", "retail fuel", "service station", "wholesale fuel"),
 }
@@ -252,11 +284,17 @@ def fetch_reference_maps(client: SupabaseRestClient) -> dict[str, dict[str, Any]
 
 
 def fetch_pending_articles(client: SupabaseRestClient) -> list[dict[str, Any]]:
+    or_filters = [
+        "enrichment_status.eq.pending",
+        "and(enrichment_status.eq.error,enrichment_error_kind.eq.retryable,enrichment_attempts.lt.3)",
+    ]
+    if REPROCESS_EXISTING and REPROCESS_STATUSES:
+        or_filters.extend(f"enrichment_status.eq.{status}" for status in REPROCESS_STATUSES)
     return client.get(
         "articles",
         {
-            "select": "id,title,summary,content_text,url,canonical_url,published_at,article_hash,source_id,enrichment_status,enrichment_attempts,enrichment_error_kind",
-            "or": "(enrichment_status.eq.pending,and(enrichment_status.eq.error,enrichment_error_kind.eq.retryable,enrichment_attempts.lt.3))",
+            "select": "id,title,summary,content_text,url,canonical_url,published_at,article_hash,source_id,enrichment_status,enrichment_attempts,enrichment_error_kind,enrichment_outcome_reason",
+            "or": f"({','.join(or_filters)})",
             "order": "published_at.desc",
             "limit": str(ARTICLE_BATCH_SIZE),
         },
@@ -284,8 +322,14 @@ def infer_event_type(title_text: str, combined_text: str) -> tuple[str | None, l
         if not unique_hits:
             continue
         score = (1.7 * len(title_hits)) + (0.9 * len(set(body_hits)))
+        context_hits = matched_patterns(combined_text, EVENT_TYPE_CONTEXT_TERMS.get(event_type, ()))
+        score += 0.3 * len(set(context_hits))
+        if title_hits and context_hits:
+            score += 0.2
         if event_type in {"conflict-disruption", "factory-shutdown", "pipeline-disruption", "port-disruption"}:
             score += 0.25
+        if len(unique_hits) == 1 and unique_hits[0] in {"attack", "policy", "investment", "strike"} and not context_hits:
+            score -= 0.6
         if score > best_score:
             best_slug = event_type
             best_terms = unique_hits
@@ -348,19 +392,30 @@ def infer_severity(event_type_slug: str, text: str, location_count: int) -> int:
     )
 
     if event_type_slug in {"conflict-disruption", "sanction", "export-control"}:
+        severity = 4
         if len(escalation_terms) >= 2 or location_count > 1:
-            return 5
-        return 4 if disruption_terms else 3
+            severity += 1
+        if not disruption_terms:
+            severity -= 1
+        return max(3, min(severity, 5))
     if event_type_slug in {"factory-shutdown", "pipeline-disruption", "port-disruption", "accident-disaster"}:
+        severity = 3
         if len(escalation_terms) >= 1 or location_count > 1:
-            return 4
-        return 3
+            severity += 1
+        return min(severity, 5)
     if event_type_slug in {"tariff", "import-ban", "policy-change", "supply-shortage"}:
-        return 3 if len(escalation_terms) >= 1 else 2
+        severity = 2
+        if len(escalation_terms) >= 1:
+            severity += 1
+        return min(severity, 4)
     if event_type_slug == "investment-announcement":
-        return 2 if "advanced packaging" in text or "lng" in text or "foundry" in text else 1
+        strategic_terms = matched_patterns(text, ("advanced packaging", "lng", "foundry", "hbm", "leading edge", "export terminal"))
+        return 2 if strategic_terms else 1
     if event_type_slug == "labor-strike":
-        return 4 if len(escalation_terms) >= 1 else 3
+        severity = 3
+        if len(escalation_terms) >= 1 or any(term in text for term in ("offshore", "lng", "pipeline", "refinery")):
+            severity += 1
+        return min(severity, 4)
     return 0
 
 
@@ -373,6 +428,26 @@ def infer_confidence(signal_score: float, has_precise_location: bool, has_subsec
     if title_hit_count >= 2:
         confidence += 0.04
     return min(round(confidence, 3), 0.97)
+
+
+def classify_non_event_status(
+    drop_reason: str,
+    industry_slug: str | None,
+    event_type_slug: str | None,
+    signal_score: float,
+    locations: list[EventLocationCandidate],
+) -> str:
+    if drop_reason == "non_event_pattern":
+        return "discarded"
+    if not industry_slug and not event_type_slug:
+        return "discarded"
+    if drop_reason == "low_signal_score" and signal_score < max(MIN_SIGNAL_SCORE - 0.5, 0):
+        return "discarded"
+    if event_type_slug and signal_score >= max(MIN_SIGNAL_SCORE - 0.3, 0):
+        return "neutral_intelligence"
+    if industry_slug or locations:
+        return "neutral_intelligence"
+    return "discarded"
 
 
 def find_countries(text: str, centroids: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
@@ -393,6 +468,59 @@ def find_countries(text: str, centroids: dict[str, dict[str, Any]]) -> list[dict
             seen.add(country_name)
 
     return matches
+
+
+def best_match_position(text: str, aliases: tuple[str, ...] | list[str]) -> int | None:
+    best: int | None = None
+    for alias in aliases:
+        position = text.find(f" {alias} ")
+        if position >= 0 and (best is None or position < best):
+            best = position
+    return best
+
+
+def precision_weight(precision: str | None) -> int:
+    weights = {
+        "terminal": 120,
+        "port": 118,
+        "facility": 116,
+        "canal": 112,
+        "strait": 110,
+        "city": 108,
+        "state": 102,
+        "province": 101,
+        "sea": 96,
+        "country": 80,
+    }
+    return weights.get(precision or "", 90)
+
+
+def mention_score(
+    title_text: str,
+    summary_text: str,
+    body_text: str,
+    aliases: tuple[str, ...] | list[str],
+    precision: str | None,
+) -> float | None:
+    title_position = best_match_position(title_text, aliases)
+    summary_position = best_match_position(summary_text, aliases)
+    body_position = best_match_position(body_text, aliases)
+    if title_position is None and summary_position is None and body_position is None:
+        return None
+
+    source_bonus = 0.0
+    position = 0
+    if title_position is not None:
+        source_bonus = 28.0
+        position = title_position
+    elif summary_position is not None:
+        source_bonus = 18.0
+        position = summary_position
+    elif body_position is not None:
+        source_bonus = 10.0
+        position = body_position
+
+    return precision_weight(precision) + source_bonus - min(position / 48.0, 8.0)
 
 
 def slugify_for_fingerprint(value: str) -> str:
@@ -439,13 +567,24 @@ def should_drop_as_non_event(title_text: str, body_text: str, event_type_slug: s
             "final investment decision",
             "starts up",
             "startup",
+            "starts production",
+            "start production",
+            "begins production",
+            "begins operations",
             "proceed with",
             "funding reaches",
+            "raises funding",
+            "secures agreements",
+            "approves project",
+            "greenlights",
+            "build oil reserve",
+            "stockpile",
             "new plant",
             "new fab",
             "commissioning",
             "commissioned",
             "bring online",
+            "investing",
         )
     ):
         return "generic_investment_language"
@@ -461,53 +600,94 @@ def resolve_locations(
     centroids: dict[str, dict[str, Any]],
     location_aliases: list[dict[str, Any]],
 ) -> tuple[list[EventLocationCandidate], list[str], list[str]]:
-    normalized = f" {normalize_text(' '.join(part for part in [title_text, summary_text, body_text] if part))} "
+    normalized_title = f" {normalize_text(title_text)} "
+    normalized_summary = f" {normalize_text(summary_text)} "
+    normalized_body = f" {normalize_text(body_text)} "
+    normalized = " ".join([normalized_title, normalized_summary, normalized_body])
     resolved: list[EventLocationCandidate] = []
     country_isos: list[str] = []
     precisions: list[str] = []
     seen_names: set[str] = set()
+    ranked_matches: list[tuple[float, EventLocationCandidate]] = []
 
     for entry in location_aliases:
-        if any(f" {alias} " in normalized for alias in entry["aliases"]):
+        score = mention_score(
+            normalized_title,
+            normalized_summary,
+            normalized_body,
+            entry["aliases"],
+            entry.get("precision"),
+        )
+        if score is not None:
             name = entry["name"]
             if name in seen_names:
                 continue
             seen_names.add(name)
             precision = entry.get("precision")
-            resolved.append(
-                EventLocationCandidate(
-                    location_name=name,
-                    latitude=entry["latitude"],
-                    longitude=entry["longitude"],
-                    location_role=entry.get("location_role", "primary"),
-                    country_iso3=entry.get("country_iso3"),
-                    admin1=entry.get("admin1"),
-                    city=entry.get("city"),
-                    precision=precision,
-                    confidence_score=0.86 if precision in {"port", "terminal", "city", "canal", "strait"} else 0.8,
+            ranked_matches.append(
+                (
+                    score,
+                    EventLocationCandidate(
+                        location_name=name,
+                        latitude=entry["latitude"],
+                        longitude=entry["longitude"],
+                        location_role=entry.get("location_role", "primary"),
+                        country_iso3=entry.get("country_iso3"),
+                        admin1=entry.get("admin1"),
+                        city=entry.get("city"),
+                        precision=precision,
+                        confidence_score=0.86 if precision in {"port", "terminal", "city", "canal", "strait"} else 0.8,
+                    ),
                 )
             )
-            if entry.get("country_iso3"):
-                country_isos.append(entry["country_iso3"])
-            if precision:
-                precisions.append(precision)
 
-    for country in find_countries(" ".join([title_text, summary_text, body_text]), centroids):
-        if country["name"] in seen_names:
+    for alias, canonical_name in COUNTRY_ALIASES.items():
+        if canonical_name in seen_names or canonical_name not in centroids:
             continue
-        seen_names.add(country["name"])
-        resolved.append(
-            EventLocationCandidate(
-                location_name=country["name"],
-                latitude=country["latitude"],
-                longitude=country["longitude"],
-                country_iso3=country["iso3"],
-                precision="country",
-                confidence_score=0.72,
+        score = mention_score(normalized_title, normalized_summary, normalized_body, [alias], "country")
+        if score is not None:
+            country = centroids[canonical_name]
+            seen_names.add(canonical_name)
+            ranked_matches.append(
+                (
+                    score,
+                    EventLocationCandidate(
+                        location_name=country["name"],
+                        latitude=country["latitude"],
+                        longitude=country["longitude"],
+                        country_iso3=country["iso3"],
+                        precision="country",
+                        confidence_score=0.72,
+                    ),
+                )
             )
-        )
-        country_isos.append(country["iso3"])
-        precisions.append("country")
+
+    for country_name, record in centroids.items():
+        if country_name in seen_names:
+            continue
+        score = mention_score(normalized_title, normalized_summary, normalized_body, [country_name.lower()], "country")
+        if score is not None:
+            seen_names.add(country_name)
+            ranked_matches.append(
+                (
+                    score,
+                    EventLocationCandidate(
+                        location_name=record["name"],
+                        latitude=record["latitude"],
+                        longitude=record["longitude"],
+                        country_iso3=record["iso3"],
+                        precision="country",
+                        confidence_score=0.72,
+                    ),
+                )
+            )
+
+    for _, location in sorted(ranked_matches, key=lambda item: item[0], reverse=True):
+        resolved.append(location)
+        if location.country_iso3:
+            country_isos.append(location.country_iso3)
+        if location.precision:
+            precisions.append(location.precision)
 
     return resolved, sorted(set(country_isos)), precisions
 
@@ -515,17 +695,60 @@ def resolve_locations(
 def fetch_existing_event(client: SupabaseRestClient, event_fingerprint: str) -> dict[str, Any] | None:
     rows = client.get(
         "events",
-        {"select": "id,title,confidence_score", "event_fingerprint": f"eq.{event_fingerprint}", "limit": "1"},
+        {
+            "select": "id,title,confidence_score,event_fingerprint,metadata",
+            "event_fingerprint": f"eq.{event_fingerprint}",
+            "limit": "1",
+        },
     )
     return rows[0] if rows else None
 
 
-def fetch_existing_location_keys(client: SupabaseRestClient, event_id: str) -> set[str]:
+def fetch_similar_events(
+    client: SupabaseRestClient,
+    industry_id: str,
+    event_type_id: str,
+    event_date: str | None,
+) -> list[dict[str, Any]]:
+    if not event_date:
+        return []
+    return client.get(
+        "events",
+        {
+            "select": "id,title,confidence_score,event_date,event_fingerprint,metadata",
+            "industry_id": f"eq.{industry_id}",
+            "event_type_id": f"eq.{event_type_id}",
+            "event_date": f"eq.{event_date}",
+            "limit": "12",
+            "order": "created_at.desc",
+        },
+    )
+
+
+def find_probable_duplicate_event(
+    similar_events: list[dict[str, Any]],
+    primary_location_key: str | None,
+    salient_tokens: list[str],
+) -> dict[str, Any] | None:
+    candidate_tokens = set(salient_tokens)
+    for event in similar_events:
+        metadata = event.get("metadata") or {}
+        existing_location_key = metadata.get("primary_location_key")
+        existing_tokens = set(metadata.get("salient_tokens") or [])
+        if primary_location_key and existing_location_key == primary_location_key:
+            if not candidate_tokens or len(candidate_tokens & existing_tokens) >= 2:
+                return event
+    return None
+
+
+def fetch_existing_locations(client: SupabaseRestClient, event_id: str) -> list[dict[str, Any]]:
     rows = client.get(
         "event_locations",
-        {"select": "location_name,latitude,longitude", "event_id": f"eq.{event_id}", "limit": "50"},
+        {"select": "id,location_name,latitude,longitude,is_canonical", "event_id": f"eq.{event_id}", "limit": "50"},
     )
-    return {f"{row['location_name']}|{row['latitude']}|{row['longitude']}" for row in rows}
+    for row in rows:
+        row["location_key"] = f"{row['location_name']}|{row['latitude']}|{row['longitude']}"
+    return rows
 
 
 def fetch_existing_event_article_ids(client: SupabaseRestClient, event_id: str) -> set[str]:
@@ -534,6 +757,20 @@ def fetch_existing_event_article_ids(client: SupabaseRestClient, event_id: str) 
         {"select": "article_id", "event_id": f"eq.{event_id}", "limit": "50"},
     )
     return {row["article_id"] for row in rows}
+
+
+def fetch_linked_event_for_article(client: SupabaseRestClient, article_id: str) -> dict[str, Any] | None:
+    links = client.get(
+        "event_articles",
+        {"select": "event_id", "article_id": f"eq.{article_id}", "limit": "1"},
+    )
+    if not links:
+        return None
+    rows = client.get(
+        "events",
+        {"select": "id,title,confidence_score,event_fingerprint,metadata", "id": f"eq.{links[0]['event_id']}", "limit": "1"},
+    )
+    return rows[0] if rows else None
 
 
 def is_retryable_exception(exc: Exception) -> bool:
@@ -548,21 +785,41 @@ def extract_event_candidate(
     source_slug: str,
     centroids: dict[str, dict[str, Any]],
     location_aliases: list[dict[str, Any]],
-) -> EventCandidate | None:
+) -> EnrichmentDecision:
     title_text = strip_html(article.get("title"))
     summary_text = strip_html(article.get("summary"))
     content_text = strip_html(article.get("content_text"))
     combined_text = normalize_text(" ".join(part for part in [title_text, summary_text, content_text] if part))
     normalized_title = normalize_text(title_text)
 
+    industry_slug, industry_terms = infer_industry(source_slug, combined_text)
     event_type_slug, event_terms, event_signal_score = infer_event_type(normalized_title, combined_text)
+    provisional_locations, _, _ = resolve_locations(title_text, summary_text, content_text, centroids, location_aliases)
     drop_reason = should_drop_as_non_event(normalized_title, combined_text, event_type_slug, event_signal_score)
     if drop_reason:
-        return None
-
-    industry_slug, industry_terms = infer_industry(source_slug, combined_text)
-    if not industry_slug or not event_type_slug:
-        return None
+        return EnrichmentDecision(
+            article_status=classify_non_event_status(
+                drop_reason,
+                industry_slug,
+                event_type_slug,
+                event_signal_score,
+                provisional_locations,
+            ),
+            outcome_reason=drop_reason,
+            review_notes=[f"signal_score:{round(event_signal_score, 3)}"],
+        )
+    if not industry_slug:
+        return EnrichmentDecision(
+            article_status="discarded",
+            outcome_reason="missing_industry",
+            review_notes=[f"event_type:{event_type_slug or 'unknown'}"],
+        )
+    if not event_type_slug:
+        return EnrichmentDecision(
+            article_status="neutral_intelligence",
+            outcome_reason="missing_event_type",
+            review_notes=[f"industry:{industry_slug}"],
+        )
 
     subsector_slug, subsector_terms = infer_subsector(industry_slug, normalized_title, combined_text)
     locations, countries, precisions = resolve_locations(title_text, summary_text, content_text, centroids, location_aliases)
@@ -578,9 +835,17 @@ def extract_event_candidate(
         len(matched_patterns(normalized_title, EVENT_TYPE_PATTERNS[event_type_slug])),
     )
     if confidence_score < MIN_EVENT_CONFIDENCE:
-        return None
+        return EnrichmentDecision(
+            article_status="neutral_intelligence" if industry_slug or locations else "discarded",
+            outcome_reason="low_confidence_event_candidate",
+            review_notes=[
+                f"confidence_score:{confidence_score}",
+                f"signal_score:{round(event_signal_score, 3)}",
+            ],
+        )
 
     salient_tokens = extract_salient_tokens(title_text)
+    primary_location_key = slugify_for_fingerprint(primary_location.location_name if primary_location else "unlocated")
     dedupe_key = slugify_for_fingerprint(
         "|".join(
             [
@@ -594,43 +859,50 @@ def extract_event_candidate(
     )
     evidence_snippet = (summary_text or title_text)[:280]
 
-    return EventCandidate(
-        title=title_text,
-        summary=(summary_text or title_text)[:600],
-        industry_slug=industry_slug,
-        subsector_slug=subsector_slug,
-        event_type_slug=event_type_slug,
-        severity_level=severity_level,
-        confidence_score=confidence_score,
-        event_date=event_date,
-        countries=countries,
-        locations=locations[:3],
-        evidence_snippet=evidence_snippet,
-        dedupe_key=dedupe_key,
-        extraction_reasons=[
-            f"event_type:{event_type_slug}",
-            f"severity:{severity_level}",
-            *(f"location:{precision}" for precision in sorted(set(precisions))),
-        ],
-        matched_terms={
-            "event": event_terms,
-            "industry": industry_terms,
-            "subsector": subsector_terms,
-        },
-        signal_score=round(event_signal_score, 3),
-        metadata={
-            "source_slug": source_slug,
-            "article_hash": article["article_hash"],
-            "extraction_method": "heuristic_v3",
-            "location_precisions": sorted(set(precisions)),
-            "matched_terms": {
+    return EnrichmentDecision(
+        article_status="evented",
+        outcome_reason="event_created",
+        candidate=EventCandidate(
+            title=title_text,
+            summary=(summary_text or title_text)[:600],
+            industry_slug=industry_slug,
+            subsector_slug=subsector_slug,
+            event_type_slug=event_type_slug,
+            severity_level=severity_level,
+            confidence_score=confidence_score,
+            event_date=event_date,
+            countries=countries,
+            locations=locations[:3],
+            evidence_snippet=evidence_snippet,
+            dedupe_key=dedupe_key,
+            extraction_reasons=[
+                f"event_type:{event_type_slug}",
+                f"severity:{severity_level}",
+                *(f"location:{precision}" for precision in sorted(set(precisions))),
+            ],
+            matched_terms={
                 "event": event_terms,
                 "industry": industry_terms,
                 "subsector": subsector_terms,
             },
-            "signal_score": round(event_signal_score, 3),
-            "dedupe_key": dedupe_key,
-        },
+            signal_score=round(event_signal_score, 3),
+            metadata={
+                "source_slug": source_slug,
+                "article_hash": article["article_hash"],
+                "extraction_method": ENRICHMENT_VERSION,
+                "location_precisions": sorted(set(precisions)),
+                "primary_location_key": primary_location_key,
+                "salient_tokens": salient_tokens,
+                "matched_terms": {
+                    "event": event_terms,
+                    "industry": industry_terms,
+                    "subsector": subsector_terms,
+                },
+                "signal_score": round(event_signal_score, 3),
+                "title_hit_count": len(matched_patterns(normalized_title, EVENT_TYPE_PATTERNS[event_type_slug])),
+                "dedupe_key": dedupe_key,
+            },
+        ),
     )
 
 
@@ -657,13 +929,14 @@ def enrich_articles() -> dict[str, Any]:
     articles = fetch_pending_articles(client)
 
     event_rows_written = 0
-    article_status_updates = {"evented": 0, "no_event": 0, "error": 0}
+    article_status_updates = {"evented": 0, "neutral_intelligence": 0, "discarded": 0, "error": 0}
     event_types_created: dict[str, int] = {}
     severity_counts: dict[str, int] = {}
     industry_counts: dict[str, int] = {}
     location_precision_counts: dict[str, int] = {}
     error_kind_counts = {"retryable": 0, "terminal": 0}
-    no_event_reasons: dict[str, int] = {}
+    outcome_reason_counts: dict[str, int] = {}
+    status_reason_samples: dict[str, list[dict[str, Any]]] = {}
 
     for article in articles:
         source_id = article["source_id"]
@@ -671,23 +944,34 @@ def enrich_articles() -> dict[str, Any]:
         attempts = int(article.get("enrichment_attempts") or 0) + 1
 
         try:
-            candidate = extract_event_candidate(article, source_slug, centroids, location_aliases)
-            if candidate is None:
+            decision = extract_event_candidate(article, source_slug, centroids, location_aliases)
+            if decision.article_status != "evented" or decision.candidate is None:
+                status_reason_samples.setdefault(decision.article_status, [])
+                if len(status_reason_samples[decision.article_status]) < 8:
+                    status_reason_samples[decision.article_status].append(
+                        {
+                            "title": article.get("title"),
+                            "reason": decision.outcome_reason,
+                            "review_notes": decision.review_notes,
+                        }
+                    )
                 client.patch(
                     "articles",
                     {"id": f"eq.{article['id']}"},
                     {
-                        "enrichment_status": "no_event",
+                        "enrichment_status": decision.article_status,
+                        "enrichment_outcome_reason": decision.outcome_reason,
                         "enrichment_error_kind": None,
                         "enrichment_attempts": attempts,
-                        "enrichment_version": "heuristic_v3",
+                        "enrichment_version": ENRICHMENT_VERSION,
                         "enriched_at": utc_now_iso(),
                         "last_enrichment_error": None,
                     },
                 )
-                article_status_updates["no_event"] += 1
-                no_event_reasons["filtered_or_low_confidence"] = no_event_reasons.get("filtered_or_low_confidence", 0) + 1
+                article_status_updates[decision.article_status] += 1
+                outcome_reason_counts[decision.outcome_reason] = outcome_reason_counts.get(decision.outcome_reason, 0) + 1
                 continue
+            candidate = decision.candidate
 
             industry_id = references["industry_by_slug"][candidate.industry_slug]["id"]
             subsector_id = (
@@ -711,7 +995,19 @@ def enrich_articles() -> dict[str, Any]:
                 slugify_for_fingerprint(primary_location_name or "unlocated"),
                 extract_salient_tokens(candidate.title),
             )
-            existing_event = fetch_existing_event(client, event_fingerprint)
+            existing_event = fetch_linked_event_for_article(client, article["id"])
+            if existing_event:
+                event_fingerprint = existing_event.get("event_fingerprint", event_fingerprint)
+            else:
+                existing_event = fetch_existing_event(client, event_fingerprint)
+            if existing_event is None:
+                existing_event = find_probable_duplicate_event(
+                    fetch_similar_events(client, industry_id, event_type_id, candidate.event_date),
+                    candidate.metadata.get("primary_location_key"),
+                    candidate.metadata.get("salient_tokens") or [],
+                )
+                if existing_event:
+                    event_fingerprint = existing_event.get("event_fingerprint", event_fingerprint)
 
             event_payload = {
                 "event_fingerprint": event_fingerprint,
@@ -730,11 +1026,36 @@ def enrich_articles() -> dict[str, Any]:
             event_id = event_rows[0]["id"]
 
             if candidate.locations:
-                existing_location_keys = fetch_existing_location_keys(client, event_id)
+                existing_locations = fetch_existing_locations(client, event_id)
+                existing_location_by_key = {row["location_key"]: row for row in existing_locations}
+                existing_canonical = next((row for row in existing_locations if row.get("is_canonical")), None)
+                desired_primary_key = (
+                    f"{candidate.locations[0].location_name}|{candidate.locations[0].latitude}|{candidate.locations[0].longitude}"
+                    if candidate.locations
+                    else None
+                )
+
+                if (
+                    desired_primary_key
+                    and existing_canonical
+                    and existing_canonical["location_key"] != desired_primary_key
+                ):
+                    client.patch(
+                        "event_locations",
+                        {"id": f"eq.{existing_canonical['id']}"},
+                        {"is_canonical": False},
+                    )
+                    if desired_primary_key in existing_location_by_key:
+                        client.patch(
+                            "event_locations",
+                            {"id": f"eq.{existing_location_by_key[desired_primary_key]['id']}"},
+                            {"is_canonical": True},
+                        )
+
                 location_rows = []
                 for index, location in enumerate(candidate.locations):
                     location_key = f"{location.location_name}|{location.latitude}|{location.longitude}"
-                    if location_key in existing_location_keys:
+                    if location_key in existing_location_by_key:
                         continue
                     location_rows.append(
                         {
@@ -746,7 +1067,7 @@ def enrich_articles() -> dict[str, Any]:
                             "location_role": location.location_role,
                             "latitude": location.latitude,
                             "longitude": location.longitude,
-                            "is_canonical": index == 0,
+                            "is_canonical": location_key == desired_primary_key and desired_primary_key not in existing_location_by_key,
                             "confidence_score": location.confidence_score,
                         }
                     )
@@ -772,9 +1093,10 @@ def enrich_articles() -> dict[str, Any]:
                 {"id": f"eq.{article['id']}"},
                 {
                     "enrichment_status": "evented",
+                    "enrichment_outcome_reason": decision.outcome_reason,
                     "enrichment_error_kind": None,
                     "enrichment_attempts": attempts,
-                    "enrichment_version": "heuristic_v3",
+                    "enrichment_version": ENRICHMENT_VERSION,
                     "enriched_at": utc_now_iso(),
                     "last_enrichment_error": None,
                 },
@@ -796,9 +1118,10 @@ def enrich_articles() -> dict[str, Any]:
                 {"id": f"eq.{article['id']}"},
                 {
                     "enrichment_status": "error",
+                    "enrichment_outcome_reason": "processing_exception",
                     "enrichment_error_kind": error_kind,
                     "enrichment_attempts": attempts,
-                    "enrichment_version": "heuristic_v3",
+                    "enrichment_version": ENRICHMENT_VERSION,
                     "enriched_at": utc_now_iso(),
                     "last_enrichment_error": str(exc)[:1000],
                 },
@@ -816,8 +1139,11 @@ def enrich_articles() -> dict[str, Any]:
         "industry_counts": industry_counts,
         "location_precision_counts": location_precision_counts,
         "error_kind_counts": error_kind_counts,
-        "no_event_reasons": no_event_reasons,
-        "enrichment_version": "heuristic_v3",
+        "outcome_reason_counts": outcome_reason_counts,
+        "status_reason_samples": status_reason_samples,
+        "reprocess_existing": REPROCESS_EXISTING,
+        "reprocess_statuses": list(REPROCESS_STATUSES),
+        "enrichment_version": ENRICHMENT_VERSION,
     }
     artifact_path = write_artifact("latest_enrichment_snapshot.json", result)
     result["artifact_path"] = str(artifact_path)

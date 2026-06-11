@@ -219,7 +219,7 @@ export function EventConsole({
     params.set("minLat", bounds.minLat.toFixed(3));
     params.set("maxLng", bounds.maxLng.toFixed(3));
     params.set("maxLat", bounds.maxLat.toFixed(3));
-    params.set("extractionMethods", "heuristic_v3");
+    params.set("extractionMethods", "heuristic_v4,heuristic_v3");
 
     Promise.resolve().then(() => {
       setLoading(true);
@@ -319,7 +319,7 @@ export function EventConsole({
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-[var(--color-muted-ink)]">
               The surface is reading the public RPC, filtering by viewport, and plotting
-              live `heuristic_v3` event coordinates with severity-aware markers.
+              live heuristic event coordinates with severity-aware markers.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">

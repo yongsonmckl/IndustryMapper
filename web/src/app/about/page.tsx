@@ -17,7 +17,7 @@ export default function AboutPage() {
         <article className="rounded-[1.6rem] border border-white/10 bg-[rgba(13,27,42,0.94)] p-6">
           <h2 className="text-xl font-semibold text-white">Map layer</h2>
           <p className="mt-3 text-sm leading-7 text-[var(--color-ink-soft)]">
-            High-confidence `heuristic_v3` events render on a live globe with viewport-aware loading,
+            High-confidence heuristic events render on a live globe with viewport-aware loading,
             severity markers, and traceable links back to source articles.
           </p>
         </article>
@@ -32,7 +32,7 @@ export default function AboutPage() {
           <h2 className="text-xl font-semibold text-white">Current focus</h2>
           <p className="mt-3 text-sm leading-7 text-[var(--color-ink-soft)]">
             The next quality step is recall tuning: keeping the map precise without losing real
-            events that should be promoted from the `no_event` pool.
+            events that should be promoted from the neutral-intelligence pool.
           </p>
         </article>
       </section>

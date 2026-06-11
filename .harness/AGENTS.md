@@ -32,17 +32,19 @@ Current runtime state as of `2026-06-10`:
 
 - `151` articles have been ingested
 - enrichment backlog has been fully reprocessed
-- `7` articles are marked `evented`
+- `15` articles are marked `evented`
+- `124` articles are marked `neutral_intelligence`
+- `12` articles are marked `discarded`
 - `0` articles are marked `pending`
-- `144` articles are marked `no_event`
-- `7` `heuristic_v3` events are currently exposed through the safe public read path
+- `0` articles are marked `error`
+- `15` `heuristic_v4` events are currently exposed through the safe public read path
 
 Important operational note:
 
 - Runtime data was intentionally reset on `2026-06-08`
 - The old exploratory `heuristic_v1` derived rows have been deleted
 - low-quality earlier event rows were later cleared during the quality rebuild
-- the app and public RPC read `heuristic_v3` only
+- the app now reads `heuristic_v4` first while remaining backward-compatible with `heuristic_v3`
 
 ## Current Source of Truth
 
@@ -217,7 +219,7 @@ Current implementation notes:
 - `enrich_events.py` processes pending articles into events
 - conservative non-event filtering is active
 - event-level dedupe is active during enrichment
-- only `heuristic_v3` events are used by the app read path
+- the app read path prefers `heuristic_v4` with `heuristic_v3` fallback
 - `cleanup_supabase.py` runs retention cleanup after enrichment
 
 Retention rule:
@@ -241,12 +243,21 @@ Operational caution:
 
 - service-role credentials were used manually during live repair and rebuild work
 - scheduled jobs should still prefer the scoped ingest-token path
+- local live reprocessing required network-enabled execution outside the default sandbox
+- this machine may block `npm` PowerShell shims; use `npm.cmd` if `npm` fails under execution-policy restrictions
 
 Current public read pattern:
 
 - do not expose raw event tables broadly
 - expose live product data through a narrow public RPC
-- expose `no_event` headlines through a separate narrow public briefing RPC rather than raw article reads
+- expose neutral-intelligence headlines through a separate narrow public briefing RPC rather than raw article reads
+- keep the public briefing path backward-compatible with legacy `no_event` rows until old data is no longer relevant
+
+Current rebuild edge cases:
+
+- reprocessing already-evented articles can demote an article without automatically deleting its old event row; validate `events` count against `evented` article count after major rebuilds
+- canonical `event_locations` updates can fail if the old canonical row is not unset before a new canonical row is inserted
+- location ranking is now much better than first-match resolution, but multi-country titles can still choose the wrong geography if the more relevant location is not present in aliases
 
 ## Frontend Architecture Rules
 
@@ -339,13 +350,12 @@ Owns:
 
 The foundation is now far enough along to move in this order:
 
-1. review recent `no_event` articles for false negatives under `heuristic_v3`
+1. review recent `neutral_intelligence` articles for false negatives under `heuristic_v4`
 2. add broader canonical coordinate coverage beyond the current alias set
 3. harden dense-area marker overlap and clustering behavior
-4. separate neutral intelligence from discarded noise before summary automation
-5. add repeatable QA and observability around enrichment drift
-6. add weekly summary generation
-7. address broader Supabase security/config warnings when product priorities allow
+4. add repeatable QA and observability around enrichment drift
+5. add weekly summary generation
+6. address broader Supabase security/config warnings when product priorities allow
 
 ## Refinement Rule
 

@@ -99,11 +99,14 @@ function buildSearchParams(state: {
   return params.toString();
 }
 
-function markerOffsets(events: PublicEvent[]) {
+function markerOffsets(events: PublicEvent[], zoom: number) {
   const grouped = new Map<string, PublicEvent[]>();
+  const precision = zoom < 2 ? 1.8 : zoom < 3 ? 0.9 : zoom < 4 ? 0.45 : 0.18;
   for (const event of events) {
     if (event.longitude == null || event.latitude == null) continue;
-    const key = `${event.longitude.toFixed(2)}:${event.latitude.toFixed(2)}`;
+    const lngKey = Math.round(event.longitude / precision) * precision;
+    const latKey = Math.round(event.latitude / precision) * precision;
+    const key = `${lngKey.toFixed(2)}:${latKey.toFixed(2)}`;
     grouped.set(key, [...(grouped.get(key) ?? []), event]);
   }
 
@@ -157,7 +160,7 @@ export function MapExplorer({
 
   const selectedEvent = events.find((event) => event.event_id === selectedId) ?? null;
   const selectedBriefing = briefings.find((item) => item.article_id === briefingId) ?? null;
-  const offsets = markerOffsets(events);
+  const offsets = markerOffsets(events, viewport.zoom);
 
   useEffect(() => {
     const params = buildSearchParams({ industry, eventType, severity, selectedId, briefingId, viewport });
@@ -284,7 +287,7 @@ export function MapExplorer({
       params.set("maxLat", bounds.maxLat.toFixed(4));
     }
     params.set("limit", "120");
-    params.set("extractionMethods", "heuristic_v3");
+    params.set("extractionMethods", "heuristic_v4,heuristic_v3");
 
     setLoadingEvents(true);
     setLoadError(null);
@@ -554,7 +557,7 @@ export function MapExplorer({
           <p className="max-w-4xl text-sm leading-7 text-[var(--color-ink-soft)]">
             The map now uses a real globe projection rather than a stretched SVG mock. Marker clicks
             animate the globe toward the selected event, severity 5 items render with high-contrast
-            white markers and cards, and neutral `no_event` headlines remain available for future
+            white markers and cards, and neutral headlines remain available for future
             weekly summaries and newsletter workflows.
           </p>
           {loadError ? <p className="mt-3 text-sm text-[#ff958a]">{loadError}</p> : null}
@@ -730,7 +733,7 @@ export function MapExplorer({
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Neutral intelligence</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">Recent `no_event` headlines</h2>
+              <h2 className="mt-2 text-2xl font-semibold text-white">Recent neutral headlines</h2>
             </div>
             <span className="inline-flex items-center justify-center rounded-full border border-[var(--color-success)]/30 bg-[rgba(89,214,154,0.14)] px-3 py-1 text-xs font-semibold text-[var(--color-success)]">
               ~
@@ -912,7 +915,7 @@ export function MapExplorer({
           <div className="mt-5 space-y-4 text-sm leading-7 text-[var(--color-ink-soft)]">
             <p>
               The next product step is not another map rewrite. It is the intelligence layer above the map:
-              cleaner `no_event` taxonomy, weekly summary generation, and editorial tooling that can turn
+              cleaner neutral-intelligence taxonomy, weekly summary generation, and editorial tooling that can turn
               neutral headlines into a digest or future newsletter.
             </p>
             <p>

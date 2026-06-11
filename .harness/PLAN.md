@@ -40,22 +40,23 @@ Implemented foundation:
 - event enrichment exists and runs
 - a Next.js homepage, map page, and about page exist
 - a narrow public event RPC exists
-- a public `no_event` briefing RPC exists
+- a public neutral-intelligence briefing RPC exists
 
 Current runtime state as of `2026-06-10`:
 
 - `151` articles ingested
-- `7` articles classified as event-bearing
+- `15` articles classified as event-bearing
+- `124` articles classified as neutral intelligence
+- `12` articles classified as discarded noise
 - `0` articles pending enrichment
-- `144` articles classified as no-event
-- `7` `heuristic_v3` events exposed to the app
+- `15` `heuristic_v4` events exposed to the app
 
 Important current state:
 
 - runtime data was reset intentionally on `2026-06-08`
 - the old exploratory `heuristic_v1` event batch has already been deleted
 - low-quality `heuristic_v2` event rows were later removed during the `2026-06-10` quality rebuild
-- the current app surface reads `heuristic_v3`
+- the current app surface prefers `heuristic_v4` with `heuristic_v3` fallback
 
 ## 4. Current Architecture
 
@@ -143,7 +144,7 @@ Current enrichment notes:
 - non-event filtering is active
 - location assignment now prefers canonical resolved locations and falls back to country-level geometry only when necessary
 - event-level dedupe is active
-- `heuristic_v3` is the current public extraction version
+- `heuristic_v4` is the current public extraction version
 
 ## 7. Severity Model
 
@@ -183,9 +184,9 @@ Canonical location handling is better than the first centroid-only pass, but fac
 
 This risk is cleared. A live map renderer and event console are now implemented on top of the public RPC.
 
-### 8.5 Risk: event recall may now be too strict
+### 8.5 Risk: event recall may still be too strict
 
-The `heuristic_v3` cleanup fixed obvious false positives, but the live post-ingest state is still only `7` events from `151` recent articles. The next task is measuring whether false negatives are now too high.
+The `heuristic_v4` rebuild materially improved live coverage, but the neutral-intelligence pool is still large enough that false-negative review remains necessary.
 
 ## 9. Revised Delivery Phases
 
@@ -242,11 +243,11 @@ Delivered:
 - event-level dedupe
 - richer structured extraction fields
 - confidence thresholds and retry-aware status handling
-- backlog fully reprocessed into `heuristic_v3`
+- backlog fully reprocessed into `heuristic_v4`
 
 Still needed:
 
-- false-negative review on recent `no_event` articles
+- false-negative review on recent `neutral_intelligence` articles
 - broader subsector and location coverage as live volume grows
 - stronger QA reporting around drift over time
 
@@ -270,7 +271,7 @@ Delivered:
 - URL-addressable filter state
 - persistent header/footer navigation
 - separated `Home`, `Map`, and `About` routes
-- clickable `no_event` headline card with detail modal
+- clickable neutral-headline card with detail modal
 
 Still needed:
 
@@ -286,13 +287,12 @@ Status: first bridge work has started through public neutral-headline surfacing,
 
 The best next sequence from the current state is:
 
-1. review recent `no_event` articles to measure `heuristic_v3` false negatives
+1. review recent `neutral_intelligence` articles to measure `heuristic_v4` false negatives
 2. improve location resolution coverage for plant, port, city, and state mentions
 3. harden map interaction for dense marker overlap and clustering
-4. split `no_event` into a more useful neutral-intelligence taxonomy before weekly summary generation
-5. add a lightweight evaluation and drift-reporting path after each enrichment run
-6. add weekly summary generation
-7. address broader Supabase security advisor warnings when product work allows
+4. add a lightweight evaluation and drift-reporting path after each enrichment run
+5. add weekly summary generation
+6. address broader Supabase security advisor warnings when product work allows
 
 ## 11. Refinement Policy
 

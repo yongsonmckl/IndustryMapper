@@ -9,8 +9,8 @@ This file lists the meaningful remaining work from the implemented phases throug
 - Phase 0: complete
 - Phase 1: complete enough for current product work
 - Phase 2: live and functioning
-- Phase 3: baseline complete, but not fully hardened
-- Phase 4: baseline complete, but not fully hardened
+- Phase 3: largely complete and live on `heuristic_v4`
+- Phase 4: largely complete and live, but still needs polish
 - Phase 5: not implemented yet, but the bridge into it has started
 
 ## Phase 0-2 Follow-Up
@@ -23,37 +23,23 @@ These phases are not the current bottleneck, but a few items still exist.
 
 ## Phase 3 Remaining Work
 
-The main open issue is no longer false positives. It is recall quality.
+The taxonomy split and live backlog rebuild are done. The remaining work is selective quality hardening.
 
-- Review recent `no_event` articles and identify false negatives under `heuristic_v3`.
-- Selectively loosen extraction rules where valid events are being missed.
-- Expand event-type matching for known misses:
-  - labor phrasing such as `striking`
-  - startup phrasing such as `starts production`
-  - funding and investment phrasing that is currently too heavily filtered
-- Revisit confidence gating where one strong signal is currently insufficient to create an event.
-- Improve subsector coverage where current matching is too sparse.
-- Add better run artifacts so enrichment quality can be compared across runs.
-- Split the current `no_event` bucket into something more useful, likely:
-  - `neutral_intelligence`
-  - `discarded` or equivalent noise bucket
-  - keep `evented`
-  - keep `error`
+- Review a larger `neutral_intelligence` sample for false negatives under `heuristic_v4`.
+- Decide whether `AI-Driven Memory Shortage Upends IT Budgets` and similar titles should stay neutral or gain a targeted shortage pattern.
+- Keep expanding subsector and event-type coverage only where it improves real recall without reopening false positives.
+- Preserve and compare enrichment artifacts over time so drift is visible after each ingest run.
+- Add an automated cleanup or reconciliation path for stale `events` rows when article status is downgraded after reprocessing.
 
 ## Phase 4 Remaining Work
 
-The live map now exists, but polish and precision work remain.
+The live globe, viewport filtering, and event-detail flow are implemented. Remaining work is precision and polish.
 
-- Improve dense-marker overlap handling.
-- Add or refine clustering behavior for crowded regions.
-- Expand geolocation coverage for:
-  - plants
-  - ports
-  - cities
-  - states / admin regions
-- Validate marker placement quality against more live events over time.
+- Replace the current zoom-aware offsetting with stronger clustering for dense regions if event density grows.
+- Expand location alias coverage for more facilities, ports, and project-specific sites.
+- Validate canonical marker placement against a wider live sample as new events arrive.
 - Continue mobile and desktop interaction QA for the real globe map.
-- Keep severity 5 presentation highly legible in dark mode as the design evolves.
+- Keep checking multi-country and conflict headlines for wrong-country canonical selection when a facility alias is missing.
 
 ## Phase 5 Preparation Work
 
@@ -69,7 +55,7 @@ This is the next real product phase.
 
 ## Recommended Implementation Order
 
-1. Fix Phase 3 recall and clarify the `no_event` taxonomy.
+1. Fix Phase 3 recall inside the `neutral_intelligence` pool.
 2. Improve geolocation precision and map overlap behavior.
 3. Add enrichment QA and drift reporting.
 4. Start Phase 5 weekly-summary generation on top of the cleaner taxonomy.

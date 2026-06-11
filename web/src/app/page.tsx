@@ -16,7 +16,7 @@ function formatDate(value: string | null) {
 
 export default async function Home() {
   const [events, briefings] = await Promise.all([
-    listPublicEvents({ limit: 4, extractionMethods: ["heuristic_v3"] }),
+    listPublicEvents({ limit: 4, extractionMethods: ["heuristic_v4", "heuristic_v3"] }),
     listPublicBriefings({ limit: 5 }),
   ]);
 
@@ -58,14 +58,14 @@ export default async function Home() {
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Live event count</p>
             <p className="mt-4 text-5xl font-semibold text-white">{events.length}</p>
             <p className="mt-3 text-sm leading-7 text-[var(--color-ink-soft)]">
-              High-confidence `heuristic_v3` events currently promoted into the public map layer.
+              High-confidence heuristic events currently promoted into the public map layer.
             </p>
           </div>
           <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-6">
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Neutral headline sample</p>
             <p className="mt-4 text-5xl font-semibold text-white">{briefings.length}</p>
             <p className="mt-3 text-sm leading-7 text-[var(--color-ink-soft)]">
-              Recent `no_event` headlines surfaced separately so they can feed future weekly digests.
+              Recent neutral-intelligence headlines surfaced separately so they can feed future weekly digests.
             </p>
           </div>
         </div>
@@ -122,7 +122,7 @@ export default async function Home() {
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Neutral intelligence</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">Recent `no_event` headlines</h2>
+              <h2 className="mt-2 text-2xl font-semibold text-white">Recent neutral headlines</h2>
             </div>
             <Link href="/map" className="text-sm font-semibold text-[var(--color-accent-soft)] transition hover:text-white">
               Review on map page

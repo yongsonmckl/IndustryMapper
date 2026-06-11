@@ -10,6 +10,7 @@ export type PublicBriefing = {
   source_name: string;
   industry_slug: "semiconductors" | "oil-gas" | null;
   enrichment_status: string;
+  enrichment_outcome_reason: string | null;
 };
 
 export async function listPublicBriefings(filters?: {
