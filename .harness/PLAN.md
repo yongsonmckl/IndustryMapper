@@ -281,7 +281,23 @@ Still needed:
 
 ### Phase 5: Weekly Intelligence Layer
 
-Status: first bridge work has started through public neutral-headline surfacing, but summary generation is not implemented.
+Status: first-pass implementation is now live.
+
+Delivered:
+
+- `weekly_summaries` review-oriented schema expansion
+- weekly summary generation script
+- stored draft summary payloads for each active industry
+- public weekly-summary RPC
+- dedicated `/weekly` operator review route in the app
+- workflow integration for recurring summary generation
+
+Still needed:
+
+- operator decision on what promotes a draft from `draft` to `reviewed` or `published`
+- better editorial ranking once neutral-intelligence volume grows further
+- tighter integration between false-negative review and weekly watchlist selection
+- any downstream newsletter or distribution workflow
 
 ## 10. Immediate Next Steps
 
@@ -291,7 +307,7 @@ The best next sequence from the current state is:
 2. improve location resolution coverage for plant, port, city, and state mentions
 3. harden map interaction for dense marker overlap and clustering
 4. add a lightweight evaluation and drift-reporting path after each enrichment run
-5. add weekly summary generation
+5. review and tune the first weekly summary drafts
 6. address broader Supabase security advisor warnings when product work allows
 
 ## 11. Refinement Policy

@@ -11,7 +11,7 @@ This file lists the meaningful remaining work from the implemented phases throug
 - Phase 2: live and functioning
 - Phase 3: largely complete and live on `heuristic_v4`
 - Phase 4: largely complete and live, but still needs polish
-- Phase 5: not implemented yet, but the bridge into it has started
+- Phase 5: first-pass implementation is live, but review and editorial tuning remain
 
 ## Phase 0-2 Follow-Up
 
@@ -41,22 +41,20 @@ The live globe, viewport filtering, and event-detail flow are implemented. Remai
 - Continue mobile and desktop interaction QA for the real globe map.
 - Keep checking multi-country and conflict headlines for wrong-country canonical selection when a facility alias is missing.
 
-## Phase 5 Preparation Work
+## Phase 5 Remaining Work
 
-This is the next real product phase.
+The first implementation pass is now in place.
 
-- Define the weekly-summary data model.
-- Decide how neutral-intelligence articles should be summarized and grouped.
-- Build a summary-generation path using:
-  - `evented` items
-  - neutral-intelligence items
-- Define newsletter-oriented output structure, but do not treat newsletter work as current priority.
-- Add operator-visible review surfaces for generated summaries before broader automation.
+- Review the stored weekly drafts in the `/weekly` surface and tune content quality where needed.
+- Decide what workflow moves a summary from `draft` to `reviewed` and then `published`.
+- Tighten neutral watchlist ranking as larger live samples expose better and worse editorial picks.
+- Connect Phase 3 false-negative review findings back into the weekly-summary input quality loop.
+- Keep newsletter or distribution work deferred until draft quality is trusted.
 
 ## Recommended Implementation Order
 
 1. Fix Phase 3 recall inside the `neutral_intelligence` pool.
 2. Improve geolocation precision and map overlap behavior.
 3. Add enrichment QA and drift reporting.
-4. Start Phase 5 weekly-summary generation on top of the cleaner taxonomy.
+4. Tune the live Phase 5 weekly drafts until operator review quality is acceptable.
 5. Treat newsletter work as a later extension after summary quality is trustworthy.

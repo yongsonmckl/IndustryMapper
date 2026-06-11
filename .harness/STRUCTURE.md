@@ -97,6 +97,12 @@ Key files:
   - includes event-level dedupe, stronger confidence gates, richer outcome logging, and canonical location refresh logic
   - important rebuild caveat: article reclassification does not implicitly garbage-collect stale `events` rows, so event/article consistency should be checked after broad reprocess runs
 
+- `generate_weekly_summaries.py`
+  - Phase 5 draft summary generator
+  - reads both `evented` items and neutral-intelligence articles
+  - writes weekly draft rows into `weekly_summaries`
+  - writes a weekly generation artifact under `tmp/weekly/`
+
 - `cleanup_supabase.py`
   - calls the Supabase retention RPC after ingest and enrichment
 
@@ -156,6 +162,13 @@ Key files:
 - `20260610_010_enrichment_taxonomy_and_briefings.sql`
   - adds `articles.enrichment_outcome_reason`
   - updates public briefings to read `neutral_intelligence` plus legacy `no_event`
+
+- `20260611_011_weekly_summary_layer.sql`
+  - expands `weekly_summaries` into a review-oriented Phase 5 table
+  - adds stored payload, review status, generation version, and public weekly-summary RPC
+
+- `20260611_012_weekly_summary_policies.sql`
+  - adds ingest-token insert and update policies for `weekly_summaries`
 
 ### `supabase/seeds/`
 
@@ -229,6 +242,9 @@ Key files:
 - `src/app/about/page.tsx`
   - product and architecture explainer page
 
+- `src/app/weekly/page.tsx`
+  - operator-facing review surface for weekly summary drafts
+
 - `src/components/map-explorer.tsx`
   - live client-side globe map surface
   - severity-colored markers
@@ -251,6 +267,9 @@ Key files:
 
 - `src/lib/events.ts`
   - helper for calling the public event RPC
+
+- `src/lib/weekly-summaries.ts`
+  - helper for calling the public weekly-summary RPC
 
 - `src/lib/supabase/server.ts`
   - server-side Supabase client setup
@@ -289,6 +308,7 @@ What is not done yet:
 - broader plant, port, city, and state location coverage
 - clustering and dense-marker overlap polish
 - weekly summary generation
+- first-pass weekly summary generation and review surface now exist
 - a fully automated stale-event cleanup path when previously evented articles are later demoted
 
 ## 9. Next Model Priorities
@@ -299,7 +319,7 @@ If another model takes over, the correct next order is:
 2. measure false negatives across recent `neutral_intelligence` articles
 3. improve geospatial assignment coverage
 4. polish clustering and dense-area map interaction
-5. add weekly summary generation
+5. tune live weekly summary draft quality and operator workflow
 
 ## 10. Refinement Guidance
 
