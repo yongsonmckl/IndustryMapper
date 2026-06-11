@@ -29,12 +29,12 @@ export default async function Home() {
           </span>
           <div className="space-y-4">
             <h1 className="max-w-4xl text-5xl font-semibold tracking-[-0.05em] text-white md:text-6xl">
-              A dark-mode control room for evented supply-chain intelligence.
+              Industry intelligence mapped, summarized, and kept current.
             </h1>
             <p className="max-w-2xl text-lg leading-8 text-[var(--color-ink-soft)]">
-              The platform now separates the narrative homepage from the live globe map,
-              while still keeping neutral headlines available for future weekly summaries
-              and newsletter-style intelligence products.
+              IndustryMapper tracks supply-chain, policy, labor, energy, and semiconductor developments in one place.
+              It pairs a live geographic event surface with weekly summaries and continuously refreshed source coverage
+              so operators can scan what changed without digging through raw feeds.
             </p>
           </div>
           <div className="flex flex-wrap gap-3">
@@ -45,10 +45,16 @@ export default async function Home() {
               Open live map
             </Link>
             <Link
+              href="/weekly"
+              className="rounded-full border border-[var(--color-success)]/30 bg-[rgba(89,214,154,0.14)] px-5 py-3 text-sm font-semibold text-[var(--color-success)] transition hover:bg-[rgba(89,214,154,0.2)]"
+            >
+              Review weekly drafts
+            </Link>
+            <Link
               href="/about"
               className="rounded-full border border-white/12 bg-white/5 px-5 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
             >
-              About this build
+              About IndustryMapper
             </Link>
           </div>
         </div>
@@ -58,14 +64,14 @@ export default async function Home() {
             <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Live event count</p>
             <p className="mt-4 text-5xl font-semibold text-white">{events.length}</p>
             <p className="mt-3 text-sm leading-7 text-[var(--color-ink-soft)]">
-              High-confidence heuristic events currently promoted into the public map layer.
+              Mapped events currently visible from the live intelligence layer.
             </p>
           </div>
           <div className="rounded-[1.5rem] border border-white/10 bg-white/6 p-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Neutral headline sample</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Weekly coverage sample</p>
             <p className="mt-4 text-5xl font-semibold text-white">{briefings.length}</p>
             <p className="mt-3 text-sm leading-7 text-[var(--color-ink-soft)]">
-              Recent neutral-intelligence headlines surfaced separately so they can feed future weekly digests.
+              Supporting articles currently retained for weekly intelligence and broader context.
             </p>
           </div>
         </div>
@@ -151,6 +157,33 @@ export default async function Home() {
                 </p>
               </a>
             ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="rounded-[1.8rem] border border-white/10 bg-[rgba(13,27,42,0.92)] p-7 shadow-[0_24px_70px_var(--color-shadow)]">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Core features</p>
+            <h2 className="text-2xl font-semibold text-white">Built for fast scanning, geographic context, and weekly review.</h2>
+            <p className="max-w-3xl text-sm leading-7 text-[var(--color-ink-soft)]">
+              Use the interactive map to inspect event severity by location, open weekly summaries by industry for a fast
+              editorial read, and keep track of both mapped events and supporting neutral coverage from current sources.
+            </p>
+          </div>
+          <div className="grid gap-3 text-sm text-[var(--color-ink-soft)] sm:grid-cols-3">
+            <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-4">
+              <p className="font-semibold text-white">Interactive maps</p>
+              <p className="mt-2 leading-7">Switch between flat and globe views, filter by industry and severity, and inspect mapped events in place.</p>
+            </div>
+            <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-4">
+              <p className="font-semibold text-white">Weekly summaries</p>
+              <p className="mt-2 leading-7">Open industry-specific weekly drafts with event highlights, watchlists, source mix, and markdown output.</p>
+            </div>
+            <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-4">
+              <p className="font-semibold text-white">Up-to-date coverage</p>
+              <p className="mt-2 leading-7">Fresh events and supporting articles are surfaced together so the map and summaries stay current.</p>
+            </div>
           </div>
         </div>
       </section>

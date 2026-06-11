@@ -53,6 +53,13 @@ jobs:
           ARTICLE_RETENTION_DAYS: "14"
         run: python ingestion/cleanup_supabase.py
 
+      - name: Generate weekly summaries
+        env:
+          SUPABASE_URL: https://uwfpjwlkypryqhfmbybj.supabase.co
+          SUPABASE_API_KEY: sb_publishable_V0f2QVxSxgU9ZGb5W5xBcg_bd0VSKEK
+          SUPABASE_INGEST_TOKEN: ${{ secrets.SUPABASE_INGEST_TOKEN }}
+        run: python ingestion/generate_weekly_summaries.py
+
       - name: Upload ingestion artifact
         if: always()
         uses: actions/upload-artifact@v4
@@ -61,3 +68,4 @@ jobs:
           path: |
             tmp/ingestion/latest_ingestion_snapshot.json
             tmp/enrichment/latest_enrichment_snapshot.json
+            tmp/weekly/latest_weekly_summary_snapshot.json

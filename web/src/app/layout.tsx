@@ -21,7 +21,13 @@ export default function RootLayout({
             <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-4 md:px-10 lg:px-12">
               <Link href="/" className="flex items-center gap-3 text-sm font-semibold tracking-[0.24em] text-white uppercase">
                 <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[var(--color-accent)] bg-[rgba(61,127,181,0.18)] text-[var(--color-accent-soft)]">
-                  IM
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+                    <circle cx="12" cy="12" r="8.25" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M3.75 12h16.5" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+                    <path d="M12 3.75c2.2 2.25 3.3 5 3.3 8.25S14.2 18 12 20.25C9.8 18 8.7 15.25 8.7 12S9.8 6 12 3.75Z" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path d="M5.5 7.75c1.9 1.1 4.1 1.65 6.5 1.65s4.6-.55 6.5-1.65" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+                    <path d="M5.5 16.25c1.9-1.1 4.1-1.65 6.5-1.65s4.6.55 6.5 1.65" fill="none" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+                  </svg>
                 </span>
                 IndustryMapper
               </Link>
@@ -31,6 +37,9 @@ export default function RootLayout({
                 </Link>
                 <Link href="/map" className="rounded-full px-4 py-2 transition hover:bg-white/10 hover:text-white">
                   Map
+                </Link>
+                <Link href="/weekly" className="rounded-full px-4 py-2 transition hover:bg-white/10 hover:text-white">
+                  Weekly
                 </Link>
                 <Link href="/about" className="rounded-full px-4 py-2 transition hover:bg-white/10 hover:text-white">
                   About
@@ -45,6 +54,7 @@ export default function RootLayout({
               <div className="flex items-center gap-5">
                 <Link href="/" className="transition hover:text-white">Home</Link>
                 <Link href="/map" className="transition hover:text-white">Map</Link>
+                <Link href="/weekly" className="transition hover:text-white">Weekly</Link>
                 <Link href="/about" className="transition hover:text-white">About</Link>
               </div>
             </div>

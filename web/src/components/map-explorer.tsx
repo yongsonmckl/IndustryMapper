@@ -1,6 +1,6 @@
 "use client";
 
-import { startTransition, useDeferredValue, useEffect, useRef, useState } from "react";
+import { startTransition, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import maplibregl, { NavigationControl, type Map as MapLibreMap, type Marker } from "maplibre-gl";
 import { usePathname, useRouter } from "next/navigation";
@@ -18,6 +18,8 @@ type ViewportState = {
   centerLat: number;
   zoom: number;
 };
+
+type ProjectionMode = "globe" | "map";
 
 type MapExplorerProps = {
   initialEvents: PublicEvent[];
@@ -125,6 +127,29 @@ function markerOffsets(events: PublicEvent[], zoom: number) {
   return offsets;
 }
 
+function applyProjection(map: MapLibreMap, mode: ProjectionMode) {
+  const mapWithProjection = map as MapLibreMap & {
+    setProjection?: (projection: { type: string }) => void;
+    setFog?: (options?: Record<string, unknown>) => void;
+  };
+
+  if (mode === "globe") {
+    mapWithProjection.setProjection?.({ type: "globe" });
+    mapWithProjection.setFog?.({
+      range: [-1, 2],
+      color: "rgba(7,18,30,0.9)",
+      "high-color": "rgba(16,34,56,0.92)",
+      "horizon-blend": 0.1,
+      "space-color": "#02060b",
+      "star-intensity": 0.25,
+    });
+    return;
+  }
+
+  mapWithProjection.setProjection?.({ type: "mercator" });
+  mapWithProjection.setFog?.();
+}
+
 export function MapExplorer({
   initialEvents,
   initialBriefings,
@@ -139,11 +164,17 @@ export function MapExplorer({
     centerLat: initialFilters.centerLat ?? 20,
     zoom: clamp(initialFilters.zoom ?? 1.55, 1, 6),
   };
+
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRefs = useRef<Map<string, Marker>>(new Map());
+  const activePopupRef = useRef<maplibregl.Popup | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
-  const initialViewportRef = useRef<ViewportState>(initialViewportState);
+  const detailCardRef = useRef<HTMLElement | null>(null);
+  const latestViewportRef = useRef(initialViewportState);
+  const suppressPopupCloseOnMoveRef = useRef(false);
+  const zoomHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [industry, setIndustry] = useState(initialFilters.industry ?? "");
   const [eventType, setEventType] = useState(initialFilters.eventType ?? "");
   const [severity, setSeverity] = useState(initialFilters.severity ?? "");
@@ -156,24 +187,145 @@ export function MapExplorer({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [viewport, setViewport] = useState<ViewportState>(initialViewportState);
-  const deferredViewport = useDeferredValue(viewport);
+  const [settledViewport, setSettledViewport] = useState<ViewportState>(initialViewportState);
+  const [projectionMode, setProjectionMode] = useState<ProjectionMode>("map");
+  const [activePopupEventId, setActivePopupEventId] = useState("");
+  const [zoomHintVisible, setZoomHintVisible] = useState(false);
+  const deferredViewport = useDeferredValue(settledViewport);
 
   const selectedEvent = events.find((event) => event.event_id === selectedId) ?? null;
   const selectedBriefing = briefings.find((item) => item.article_id === briefingId) ?? null;
   const offsets = markerOffsets(events, viewport.zoom);
 
   useEffect(() => {
-    const params = buildSearchParams({ industry, eventType, severity, selectedId, briefingId, viewport });
+    latestViewportRef.current = settledViewport;
+  }, [settledViewport]);
+
+  function clearZoomHint() {
+    if (zoomHintTimeoutRef.current) {
+      clearTimeout(zoomHintTimeoutRef.current);
+      zoomHintTimeoutRef.current = null;
+    }
+  }
+
+  const closeActivePopup = useCallback(() => {
+    activePopupRef.current?.remove();
+    activePopupRef.current = null;
+    setActivePopupEventId("");
+  }, []);
+
+  const openEventPopup = useCallback((event: PublicEvent) => {
+    const map = mapRef.current;
+    const marker = markerRefs.current.get(event.event_id);
+    if (!map || !marker || event.longitude == null || event.latitude == null) return;
+
+    closeActivePopup();
+
+    const container = document.createElement("div");
+    container.className = "min-w-[15rem] max-w-[18rem] space-y-3";
+
+    const header = document.createElement("div");
+    header.className = "flex items-start justify-between gap-3";
+
+    const titleWrap = document.createElement("div");
+    titleWrap.className = "space-y-1";
+
+    const kicker = document.createElement("p");
+    kicker.className = "text-[11px] font-semibold uppercase tracking-[0.18em] text-[#9bc6ff]";
+    kicker.textContent = event.industry_slug;
+
+    const title = document.createElement("p");
+    title.className = "text-sm font-semibold leading-6 text-white";
+    title.textContent = event.title;
+
+    titleWrap.append(kicker, title);
+
+    const closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.className = "inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-sm text-white/80 transition hover:bg-white/10 hover:text-white";
+    closeButton.textContent = "×";
+    closeButton.onclick = () => closeActivePopup();
+
+    header.append(titleWrap, closeButton);
+
+    const location = document.createElement("p");
+    location.className = "text-xs leading-6 text-[#c6d8ef]";
+    location.textContent = `${formatDate(event.event_date)} | ${markerLabel(event)}`;
+
+    const action = document.createElement("button");
+    action.type = "button";
+    action.className = "inline-flex w-full items-center justify-center rounded-full bg-[#4c8fd9] px-4 py-2 text-xs font-semibold text-white transition hover:brightness-110";
+    action.textContent = "More info";
+    action.onclick = () => {
+      detailCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+
+    container.append(header, location, action);
+
+    const popup = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      closeOnMove: false,
+      offset: 22,
+      anchor: "bottom",
+      maxWidth: "320px",
+    })
+      .setLngLat([event.longitude, event.latitude])
+      .setHTML("")
+      .setDOMContent(container)
+      .addTo(map);
+
+    popup.on("close", () => {
+      if (activePopupRef.current === popup) {
+        activePopupRef.current = null;
+        setActivePopupEventId("");
+      }
+    });
+
+    activePopupRef.current = popup;
+    setActivePopupEventId(event.event_id);
+  }, [closeActivePopup]);
+
+  function focusEvent(event: PublicEvent, openPopup = true) {
+    setSelectedId(event.event_id);
+    setBriefingId("");
+    if (openPopup) {
+      openEventPopup(event);
+    }
+
+    const map = mapRef.current;
+    if (map && event.longitude != null && event.latitude != null) {
+      suppressPopupCloseOnMoveRef.current = true;
+      map.easeTo({
+        center: [event.longitude, event.latitude],
+        zoom: Math.max(map.getZoom(), 2.4),
+        duration: 900,
+        essential: true,
+      });
+    }
+  }
+
+  useEffect(() => {
+    const params = buildSearchParams({
+      industry,
+      eventType,
+      severity,
+      selectedId,
+      briefingId,
+      viewport: settledViewport,
+    });
     startTransition(() => {
       router.replace(params ? `${pathname}?${params}` : pathname, { scroll: false });
     });
-  }, [briefingId, eventType, industry, pathname, router, selectedId, severity, viewport]);
+  }, [briefingId, eventType, industry, pathname, router, selectedId, severity, settledViewport]);
 
   useEffect(() => {
     const container = mapContainerRef.current;
-    if (!container || mapRef.current) return;
-    const initialViewport = initialViewportRef.current;
+    if (!container) return;
 
+    const markers = markerRefs.current;
+    const initialViewport = latestViewportRef.current;
+    setMapReady(false);
     const map = new maplibregl.Map({
       container,
       style: MAP_STYLE,
@@ -193,28 +345,17 @@ export function MapExplorer({
     map.addControl(new NavigationControl({ showCompass: false, visualizePitch: false }), "top-right");
 
     map.on("load", () => {
-      const globeMap = map as MapLibreMap & {
-        setProjection?: (projection: { type: string }) => void;
-        setFog?: (options: Record<string, unknown>) => void;
-      };
-      globeMap.setProjection?.({ type: "globe" });
-      globeMap.setFog?.({
-        range: [-1, 2],
-        color: "rgba(7,18,30,0.9)",
-        "high-color": "rgba(16,34,56,0.92)",
-        "horizon-blend": 0.1,
-        "space-color": "#02060b",
-        "star-intensity": 0.25,
-      });
-      map.easeTo({
-        center: [initialViewport.centerLng, initialViewport.centerLat],
-        zoom: initialViewport.zoom,
-        duration: 0,
-      });
+      applyProjection(map, projectionMode);
       setMapReady(true);
     });
 
-    map.on("moveend", () => {
+    map.on("movestart", () => {
+      if (!suppressPopupCloseOnMoveRef.current) {
+        closeActivePopup();
+      }
+    });
+
+    map.on("move", () => {
       const center = map.getCenter();
       setViewport({
         centerLng: Number(center.lng.toFixed(4)),
@@ -223,11 +364,36 @@ export function MapExplorer({
       });
     });
 
+    map.on("moveend", () => {
+      const center = map.getCenter();
+      const nextViewport = {
+        centerLng: Number(center.lng.toFixed(4)),
+        centerLat: Number(center.lat.toFixed(4)),
+        zoom: Number(map.getZoom().toFixed(2)),
+      };
+      setViewport(nextViewport);
+      setSettledViewport(nextViewport);
+      if (suppressPopupCloseOnMoveRef.current) {
+        suppressPopupCloseOnMoveRef.current = false;
+      }
+    });
+
     const wheelHandler = (event: WheelEvent) => {
-      if (!event.ctrlKey && !event.shiftKey) {
+      event.preventDefault();
+
+      if (!event.ctrlKey) {
+        clearZoomHint();
+        setZoomHintVisible(true);
+        zoomHintTimeoutRef.current = setTimeout(() => {
+          setZoomHintVisible(false);
+          zoomHintTimeoutRef.current = null;
+        }, 1800);
         return;
       }
-      event.preventDefault();
+
+      setZoomHintVisible(false);
+      clearZoomHint();
+
       const rect = container.getBoundingClientRect();
       const point = [event.clientX - rect.left, event.clientY - rect.top] as [number, number];
       const anchor = map.unproject(point);
@@ -242,9 +408,10 @@ export function MapExplorer({
     container.addEventListener("wheel", wheelHandler, { passive: false });
     resizeObserverRef.current = new ResizeObserver(() => map.resize());
     resizeObserverRef.current.observe(container);
-    const markers = markerRefs.current;
 
     return () => {
+      clearZoomHint();
+      closeActivePopup();
       container.removeEventListener("wheel", wheelHandler);
       resizeObserverRef.current?.disconnect();
       markers.forEach((marker) => marker.remove());
@@ -252,23 +419,7 @@ export function MapExplorer({
       map.remove();
       mapRef.current = null;
     };
-  }, []);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    const center = map.getCenter();
-    const centerChanged =
-      Math.abs(center.lng - viewport.centerLng) > 0.01 || Math.abs(center.lat - viewport.centerLat) > 0.01;
-    const zoomChanged = Math.abs(map.getZoom() - viewport.zoom) > 0.01;
-    if (centerChanged || zoomChanged) {
-      map.easeTo({
-        center: [viewport.centerLng, viewport.centerLat],
-        zoom: viewport.zoom,
-        duration: 350,
-      });
-    }
-  }, [viewport]);
+  }, [closeActivePopup, projectionMode]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -298,7 +449,11 @@ export function MapExplorer({
         if (!response.ok) {
           throw new Error(payload.error ?? "Failed to load events.");
         }
+
         const nextEvents = payload.events ?? [];
+        if (activePopupEventId && !nextEvents.some((event) => event.event_id === activePopupEventId)) {
+          closeActivePopup();
+        }
         setEvents(nextEvents);
         setSelectedId((current) => {
           if (!nextEvents.length) return "";
@@ -317,10 +472,11 @@ export function MapExplorer({
       });
 
     return () => controller.abort();
-  }, [deferredViewport, eventType, industry, mapReady, severity]);
+  }, [activePopupEventId, closeActivePopup, deferredViewport, eventType, industry, mapReady, severity]);
 
   useEffect(() => {
     if (!mapReady) return;
+
     const controller = new AbortController();
     const params = new URLSearchParams();
     if (industry) params.set("industry", industry);
@@ -353,20 +509,6 @@ export function MapExplorer({
     return () => controller.abort();
   }, [industry, mapReady]);
 
-  function selectEvent(event: PublicEvent) {
-    setSelectedId(event.event_id);
-    setBriefingId("");
-    const map = mapRef.current;
-    if (map && event.longitude != null && event.latitude != null) {
-      map.easeTo({
-        center: [event.longitude, event.latitude],
-        zoom: Math.max(map.getZoom(), 2.4),
-        duration: 900,
-        essential: true,
-      });
-    }
-  }
-
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -389,28 +531,53 @@ export function MapExplorer({
 
       const button = existing?.getElement() as HTMLButtonElement | undefined ?? document.createElement("button");
       button.type = "button";
-      button.className = "flex h-11 w-11 items-center justify-center rounded-full border text-xs font-bold shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition-transform hover:scale-105";
-      button.style.background = severe ? "#ffffff" : severity.hex;
-      button.style.color = severe ? "#02060b" : "#ffffff";
-      button.style.borderColor = event.event_id === selectedId ? "#9bc6ff" : severe ? "#0f172a" : "rgba(255,255,255,0.5)";
-      button.style.borderWidth = event.event_id === selectedId ? "3px" : "2px";
-      button.style.transform = event.event_id === selectedId ? "scale(1.12)" : "scale(1)";
-      button.textContent = event.severity_level === 5 ? "5!" : String(event.severity_level);
+      button.className = "flex h-12 w-12 items-center justify-center rounded-full";
       button.title = event.title;
-      button.onclick = () => selectEvent(event);
+      button.onclick = () => {
+        setSelectedId(event.event_id);
+        setBriefingId("");
+        openEventPopup(event);
+        if (map && event.longitude != null && event.latitude != null) {
+          suppressPopupCloseOnMoveRef.current = true;
+          map.easeTo({
+            center: [event.longitude, event.latitude],
+            zoom: Math.max(map.getZoom(), 2.4),
+            duration: 900,
+            essential: true,
+          });
+        }
+      };
 
-      const popup = new maplibregl.Popup({
-        closeButton: false,
-        closeOnClick: false,
-        offset: 18,
-      }).setHTML(
-        `<div class="space-y-1"><p style="font-size:11px;letter-spacing:0.18em;text-transform:uppercase;color:#9bc6ff;">${event.industry_slug}</p><p style="font-size:14px;font-weight:700;line-height:1.5;">${event.title}</p><p style="font-size:12px;color:#c6d8ef;">${markerLabel(event)}</p></div>`,
-      );
+      let inner = button.firstElementChild as HTMLSpanElement | null;
+      if (!inner) {
+        inner = document.createElement("span");
+        button.appendChild(inner);
+      }
+
+      inner.className = "pointer-events-none inline-flex h-11 w-11 items-center justify-center rounded-full border text-xs font-bold shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition-transform duration-150";
+      inner.textContent = event.severity_level === 5 ? "5!" : String(event.severity_level);
+      inner.style.background = severe ? "#ffffff" : severity.hex;
+      inner.style.color = severe ? "#02060b" : "#ffffff";
+      inner.style.borderColor =
+        event.event_id === selectedId || event.event_id === activePopupEventId
+          ? "#9bc6ff"
+          : severe
+            ? "#0f172a"
+            : "rgba(255,255,255,0.5)";
+      inner.style.borderWidth =
+        event.event_id === selectedId || event.event_id === activePopupEventId ? "3px" : "2px";
+      inner.style.transform = event.event_id === selectedId ? "scale(1.12)" : "scale(1)";
+
+      button.onmouseenter = () => {
+        inner!.style.transform = event.event_id === selectedId ? "scale(1.16)" : "scale(1.08)";
+      };
+      button.onmouseleave = () => {
+        inner!.style.transform = event.event_id === selectedId ? "scale(1.12)" : "scale(1)";
+      };
 
       if (existing) {
         existing.setLngLat([event.longitude, event.latitude]);
         existing.setOffset(offset);
-        existing.setPopup(popup);
       } else {
         const marker = new maplibregl.Marker({
           element: button,
@@ -418,12 +585,11 @@ export function MapExplorer({
           anchor: "center",
         })
           .setLngLat([event.longitude, event.latitude])
-          .setPopup(popup)
           .addTo(map);
         markerRefs.current.set(event.event_id, marker);
       }
     }
-  }, [events, offsets, selectedId]);
+  }, [activePopupEventId, events, offsets, openEventPopup, selectedId]);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 md:px-10 lg:px-12 lg:py-10">
@@ -432,15 +598,15 @@ export function MapExplorer({
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-4">
               <span className="inline-flex w-fit rounded-full border border-[var(--color-accent)]/30 bg-[rgba(76,143,217,0.14)] px-4 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent-soft)]">
-                Live globe map
+                Live event map
               </span>
               <div className="space-y-3">
                 <h1 className="text-4xl font-semibold tracking-[-0.05em] text-white md:text-5xl">
-                  A real globe, live markers, and neutral intelligence beside it.
+                  A switchable globe, a flat map, and live event markers.
                 </h1>
                 <p className="max-w-3xl text-base leading-8 text-[var(--color-ink-soft)]">
-                  Drag the globe to move, hold <strong>Ctrl</strong> or <strong>Shift</strong> while
-                  scrolling to zoom, and select a marker to animate the map toward that event.
+                  Drag the surface to move, switch between globe and flat-map views, and hold <strong>Ctrl</strong> while
+                  scrolling to zoom.
                 </p>
               </div>
             </div>
@@ -528,7 +694,14 @@ export function MapExplorer({
                 style={{
                   backgroundColor: severity === String(level.level) ? level.hex : "rgba(255,255,255,0.05)",
                   border: severity === String(level.level) ? "none" : "1px solid rgba(255,255,255,0.1)",
-                  color: severity === String(level.level) && level.level === 5 ? "#02060b" : undefined,
+                  color:
+                    severity === String(level.level)
+                      ? level.level === 5
+                        ? "#ffffff"
+                        : level.level === 1
+                          ? "#02060b"
+                          : undefined
+                      : undefined,
                 }}
               >
                 {level.level}
@@ -543,237 +716,58 @@ export function MapExplorer({
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-muted-ink)]">Interactive map</p>
             <p className="mt-2 text-sm text-[var(--color-ink-soft)]">
-              Scroll-zoom is intentionally gated behind <strong>Ctrl</strong> or <strong>Shift</strong>.
+              Scroll-zoom is intentionally gated behind <strong>Ctrl</strong>.
             </p>
           </div>
-          <div className="flex items-center gap-3 text-xs uppercase tracking-[0.16em] text-[var(--color-muted-ink)]">
-            <span>Center {viewport.centerLng.toFixed(1)}, {viewport.centerLat.toFixed(1)}</span>
+          <div className="flex flex-wrap items-center gap-3 text-xs uppercase tracking-[0.16em] text-[var(--color-muted-ink)]">
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 p-1 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setProjectionMode("globe")}
+                className={`rounded-full px-3 py-2 transition ${
+                  projectionMode === "globe" ? "bg-[var(--color-accent)] text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                Globe
+              </button>
+              <button
+                type="button"
+                onClick={() => setProjectionMode("map")}
+                className={`rounded-full px-3 py-2 transition ${
+                  projectionMode === "map" ? "bg-[var(--color-accent)] text-white" : "text-white/70 hover:bg-white/10 hover:text-white"
+                }`}
+              >
+                Map
+              </button>
+            </div>
             <span>Zoom {viewport.zoom.toFixed(1)}x</span>
-            {(loadingEvents || loadingBriefings) ? <span>Refreshing…</span> : null}
+            {(loadingEvents || loadingBriefings) ? <span>Refreshing...</span> : null}
           </div>
         </div>
-        <div ref={mapContainerRef} className="h-[64vh] min-h-[34rem] w-full overflow-hidden rounded-b-[2rem]" />
+
+        <div className="relative">
+          <div ref={mapContainerRef} className="h-[64vh] min-h-[34rem] w-full overflow-hidden rounded-b-[2rem]" />
+          <div
+            className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-[rgba(2,6,11,0.38)] backdrop-blur-[2px] transition-opacity duration-200 ${
+              zoomHintVisible ? "opacity-100" : "opacity-0"
+            }`}
+          >
+              <div className="rounded-[1.4rem] border border-white/15 bg-[rgba(6,14,24,0.92)] px-6 py-5 text-center shadow-[0_22px_60px_rgba(0,0,0,0.35)]">
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-accent-soft)]">Zoom hint</p>
+                <p className="mt-3 text-sm leading-7 text-white">
+                  Hold <strong>Ctrl</strong> while scrolling to zoom the map.
+                </p>
+              </div>
+            </div>
+        </div>
+
         <div className="border-t border-white/10 px-6 py-5 md:px-8">
           <p className="max-w-4xl text-sm leading-7 text-[var(--color-ink-soft)]">
-            The map now uses a real globe projection rather than a stretched SVG mock. Marker clicks
-            animate the globe toward the selected event, severity 5 items render with high-contrast
-            white markers and cards, and neutral headlines remain available for future
-            weekly summaries and newsletter workflows.
+            The map now supports both flat-map and globe projections. Marker clicks keep a compact popup open until
+            the map moves again or the user closes it, and each popup can jump directly into the event detail card below.
           </p>
           {loadError ? <p className="mt-3 text-sm text-[#ff958a]">{loadError}</p> : null}
         </div>
-      </section>
-
-      <section className="grid gap-8 xl:grid-cols-[1.05fr_0.95fr]">
-        <section className={`rounded-[1.9rem] border p-7 shadow-[0_22px_70px_var(--color-shadow)] ${
-          selectedEvent?.severity_level === 5
-            ? "border-white/70 bg-white text-slate-950"
-            : "border-white/10 bg-[rgba(13,27,42,0.94)] text-white"
-        }`}>
-          {selectedEvent ? (
-            <>
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="space-y-3">
-                  <div className={`flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${
-                    selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
-                  }`}>
-                    <span>{selectedEvent.industry_slug}</span>
-                    {selectedEvent.subsector_slug ? <span>{selectedEvent.subsector_slug}</span> : null}
-                    {selectedEvent.event_type_slug ? <span>{selectedEvent.event_type_slug}</span> : null}
-                  </div>
-                  <h2 className="text-3xl font-semibold tracking-tight">{selectedEvent.title}</h2>
-                </div>
-                <div
-                  className={`rounded-2xl px-4 py-3 text-right ${
-                    selectedEvent.severity_level === 5 ? "border border-slate-300 bg-slate-950 text-white" : "border border-white/10"
-                  }`}
-                  style={selectedEvent.severity_level === 5 ? undefined : { backgroundColor: `${severityMeta(selectedEvent.severity_level).hex}22` }}
-                >
-                  <p
-                    className="text-xs uppercase tracking-[0.18em]"
-                    style={selectedEvent.severity_level === 5 ? undefined : { color: severityMeta(selectedEvent.severity_level).hex }}
-                  >
-                    Severity
-                  </p>
-                  <p className="mt-2 text-3xl font-semibold">
-                    {selectedEvent.severity_level}
-                  </p>
-                  <p className="text-sm">
-                    {severityMeta(selectedEvent.severity_level).label}
-                  </p>
-                </div>
-              </div>
-
-              <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {[
-                  ["Date", formatDate(selectedEvent.event_date)],
-                  ["Location", markerLabel(selectedEvent)],
-                  ["Confidence", `${Math.round(Number(selectedEvent.confidence_score) * 100)}%`],
-                  ["Evidence", String(selectedEvent.article_count)],
-                ].map(([label, value]) => (
-                  <div
-                    key={label}
-                    className={`rounded-[1.35rem] p-4 ${
-                      selectedEvent.severity_level === 5 ? "bg-slate-100" : "bg-white/5"
-                    }`}
-                  >
-                    <p className={`text-xs uppercase tracking-[0.18em] ${
-                      selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
-                    }`}>
-                      {label}
-                    </p>
-                    <p className="mt-2 font-semibold">{value}</p>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-8 space-y-7">
-                <div>
-                  <p className={`text-xs uppercase tracking-[0.22em] ${
-                    selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
-                  }`}>
-                    Summary
-                  </p>
-                  <p className={`mt-3 text-base leading-8 ${
-                    selectedEvent.severity_level === 5 ? "text-slate-700" : "text-[var(--color-ink-soft)]"
-                  }`}>
-                    {selectedEvent.summary}
-                  </p>
-                </div>
-
-                <div>
-                  <p className={`text-xs uppercase tracking-[0.22em] ${
-                    selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
-                  }`}>
-                    Evidence
-                  </p>
-                  <blockquote className={`mt-3 rounded-[1.3rem] border p-5 text-sm leading-7 ${
-                    selectedEvent.severity_level === 5 ? "border-slate-200 bg-slate-100 text-slate-700" : "border-white/10 bg-white/5 text-[var(--color-ink-soft)]"
-                  }`}>
-                    {selectedEvent.evidence_snippet ?? "No evidence snippet stored."}
-                  </blockquote>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className={`rounded-[1.4rem] border p-5 ${
-                    selectedEvent.severity_level === 5 ? "border-slate-200 bg-slate-100" : "border-white/10 bg-white/5"
-                  }`}>
-                    <p className={`text-xs uppercase tracking-[0.22em] ${
-                      selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
-                    }`}>
-                      Traceability
-                    </p>
-                    <dl className="mt-4 space-y-3 text-sm">
-                      <div>
-                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Extraction</dt>
-                        <dd className="mt-1 font-semibold">{selectedEvent.extraction_method}</dd>
-                      </div>
-                      <div>
-                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Source</dt>
-                        <dd className="mt-1 font-semibold">{selectedEvent.source_name}</dd>
-                      </div>
-                      <div>
-                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Dedupe key</dt>
-                        <dd className="mt-1 break-all font-semibold">{selectedEvent.dedupe_key ?? "Unavailable"}</dd>
-                      </div>
-                    </dl>
-                  </div>
-
-                  <div className={`rounded-[1.4rem] border p-5 ${
-                    selectedEvent.severity_level === 5 ? "border-slate-200 bg-slate-100" : "border-white/10 bg-white/5"
-                  }`}>
-                    <p className={`text-xs uppercase tracking-[0.22em] ${
-                      selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
-                    }`}>
-                      Map context
-                    </p>
-                    <dl className="mt-4 space-y-3 text-sm">
-                      <div>
-                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Coordinates</dt>
-                        <dd className="mt-1 font-semibold">
-                          {selectedEvent.latitude?.toFixed(3) ?? "?"}, {selectedEvent.longitude?.toFixed(3) ?? "?"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Role</dt>
-                        <dd className="mt-1 font-semibold">{selectedEvent.location_role ?? "unassigned"}</dd>
-                      </div>
-                      <div>
-                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Reference</dt>
-                        <dd className="mt-1">
-                          <a
-                            href={selectedEvent.source_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`font-semibold underline-offset-4 hover:underline ${
-                              selectedEvent.severity_level === 5 ? "text-slate-900" : "text-[var(--color-accent-soft)]"
-                            }`}
-                          >
-                            Open source article
-                          </a>
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <div className="rounded-[1.6rem] border border-dashed border-white/12 bg-white/4 p-8">
-              <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Event detail</p>
-              <h2 className="mt-4 text-2xl font-semibold">No event selected</h2>
-              <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--color-ink-soft)]">
-                Choose a marker or an event card to center the map and inspect the structured event detail.
-              </p>
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-[1.9rem] border border-white/10 bg-[rgba(13,27,42,0.94)] p-7 shadow-[0_22px_70px_var(--color-shadow)]">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Neutral intelligence</p>
-              <h2 className="mt-2 text-2xl font-semibold text-white">Recent neutral headlines</h2>
-            </div>
-            <span className="inline-flex items-center justify-center rounded-full border border-[var(--color-success)]/30 bg-[rgba(89,214,154,0.14)] px-3 py-1 text-xs font-semibold text-[var(--color-success)]">
-              ~
-            </span>
-          </div>
-
-          <div className="mt-5 grid gap-4">
-            {briefings.map((briefing) => (
-              <button
-                key={briefing.article_id}
-                type="button"
-                onClick={() => {
-                  setBriefingId(briefing.article_id);
-                  setSelectedId("");
-                }}
-                className={`rounded-[1.35rem] border p-5 text-left transition ${
-                  briefing.article_id === briefingId
-                    ? "border-[var(--color-success)]/60 bg-[rgba(89,214,154,0.12)]"
-                    : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/8"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-4">
-                  <h3 className="text-lg font-semibold leading-7 text-white">{briefing.title}</h3>
-                  <span className="inline-flex items-center justify-center rounded-full border border-[var(--color-success)]/30 bg-[rgba(89,214,154,0.14)] px-3 py-1 text-xs font-semibold text-[var(--color-success)]">
-                    ~
-                  </span>
-                </div>
-                <div className="mt-4 flex flex-wrap gap-3 text-xs uppercase tracking-[0.16em] text-[var(--color-muted-ink)]">
-                  <span>{formatDate(briefing.published_at)}</span>
-                  <span>{briefing.source_name}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-6 rounded-[1.4rem] border border-dashed border-white/12 bg-white/4 p-5 text-sm leading-7 text-[var(--color-ink-soft)]">
-            These articles are not map-promoted events, but they remain useful for future weekly summaries,
-            neutral intelligence digests, and newsletter experiments.
-          </div>
-        </section>
       </section>
 
       {selectedBriefing ? (
@@ -846,7 +840,243 @@ export function MapExplorer({
         </div>
       ) : null}
 
-      <section className="grid gap-5 lg:grid-cols-2">
+      <section ref={detailCardRef} className="grid gap-5 xl:grid-cols-3">
+        <section
+          className={`rounded-[1.9rem] border p-7 shadow-[0_22px_70px_var(--color-shadow)] ${
+            selectedEvent?.severity_level === 5
+              ? "border-white/70 bg-white text-slate-950"
+              : "border-white/10 bg-[rgba(13,27,42,0.94)] text-white"
+          }`}
+        >
+          {selectedEvent ? (
+            <>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="space-y-3">
+                  <div
+                    className={`flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                      selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
+                    }`}
+                  >
+                    <span>{selectedEvent.industry_slug}</span>
+                    {selectedEvent.subsector_slug ? <span>{selectedEvent.subsector_slug}</span> : null}
+                    {selectedEvent.event_type_slug ? <span>{selectedEvent.event_type_slug}</span> : null}
+                  </div>
+                  <h2 className="text-3xl font-semibold tracking-tight">{selectedEvent.title}</h2>
+                </div>
+                <div
+                  className={`rounded-2xl px-4 py-3 text-right ${
+                    selectedEvent.severity_level === 5 ? "border border-slate-300 bg-slate-950 text-white" : "border border-white/10"
+                  }`}
+                  style={
+                    selectedEvent.severity_level === 5
+                      ? undefined
+                      : { backgroundColor: `${severityMeta(selectedEvent.severity_level).hex}22` }
+                  }
+                >
+                  <p
+                    className="text-xs uppercase tracking-[0.18em]"
+                    style={
+                      selectedEvent.severity_level === 5
+                        ? undefined
+                        : { color: severityMeta(selectedEvent.severity_level).hex }
+                    }
+                  >
+                    Severity
+                  </p>
+                  <p className="mt-2 text-3xl font-semibold">{selectedEvent.severity_level}</p>
+                  <p className="text-sm">{severityMeta(selectedEvent.severity_level).label}</p>
+                </div>
+              </div>
+
+              <div className="mt-7 grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+                {[
+                  ["Date", formatDate(selectedEvent.event_date)],
+                  ["Location", markerLabel(selectedEvent)],
+                  ["Confidence", `${Math.round(Number(selectedEvent.confidence_score) * 100)}%`],
+                  ["Evidence", String(selectedEvent.article_count)],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    className={`rounded-[1.35rem] p-4 ${selectedEvent.severity_level === 5 ? "bg-slate-100" : "bg-white/5"}`}
+                  >
+                    <p
+                      className={`text-xs uppercase tracking-[0.18em] ${
+                        selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
+                      }`}
+                    >
+                      {label}
+                    </p>
+                    <p className="mt-2 font-semibold">{value}</p>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8 space-y-7">
+                <div>
+                  <p
+                    className={`text-xs uppercase tracking-[0.22em] ${
+                      selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
+                    }`}
+                  >
+                    Summary
+                  </p>
+                  <p
+                    className={`mt-3 text-base leading-8 ${
+                      selectedEvent.severity_level === 5 ? "text-slate-700" : "text-[var(--color-ink-soft)]"
+                    }`}
+                  >
+                    {selectedEvent.summary}
+                  </p>
+                </div>
+
+                <div>
+                  <p
+                    className={`text-xs uppercase tracking-[0.22em] ${
+                      selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
+                    }`}
+                  >
+                    Evidence
+                  </p>
+                  <blockquote
+                    className={`mt-3 rounded-[1.3rem] border p-5 text-sm leading-7 ${
+                      selectedEvent.severity_level === 5
+                        ? "border-slate-200 bg-slate-100 text-slate-700"
+                        : "border-white/10 bg-white/5 text-[var(--color-ink-soft)]"
+                    }`}
+                  >
+                    {selectedEvent.evidence_snippet ?? "No evidence snippet stored."}
+                  </blockquote>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div
+                    className={`rounded-[1.4rem] border p-5 ${
+                      selectedEvent.severity_level === 5 ? "border-slate-200 bg-slate-100" : "border-white/10 bg-white/5"
+                    }`}
+                  >
+                    <p
+                      className={`text-xs uppercase tracking-[0.22em] ${
+                        selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
+                      }`}
+                    >
+                      Traceability
+                    </p>
+                    <dl className="mt-4 space-y-3 text-sm">
+                      <div>
+                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Extraction</dt>
+                        <dd className="mt-1 font-semibold">{selectedEvent.extraction_method}</dd>
+                      </div>
+                      <div>
+                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Source</dt>
+                        <dd className="mt-1 font-semibold">{selectedEvent.source_name}</dd>
+                      </div>
+                      <div>
+                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Dedupe key</dt>
+                        <dd className="mt-1 break-all font-semibold">{selectedEvent.dedupe_key ?? "Unavailable"}</dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  <div
+                    className={`rounded-[1.4rem] border p-5 ${
+                      selectedEvent.severity_level === 5 ? "border-slate-200 bg-slate-100" : "border-white/10 bg-white/5"
+                    }`}
+                  >
+                    <p
+                      className={`text-xs uppercase tracking-[0.22em] ${
+                        selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
+                      }`}
+                    >
+                      Map context
+                    </p>
+                    <dl className="mt-4 space-y-3 text-sm">
+                      <div>
+                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Coordinates</dt>
+                        <dd className="mt-1 font-semibold">
+                          {selectedEvent.latitude?.toFixed(3) ?? "?"}, {selectedEvent.longitude?.toFixed(3) ?? "?"}
+                        </dd>
+                      </div>
+                      <div>
+                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Role</dt>
+                        <dd className="mt-1 font-semibold">{selectedEvent.location_role ?? "unassigned"}</dd>
+                      </div>
+                      <div>
+                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Reference</dt>
+                        <dd className="mt-1">
+                          <a
+                            href={selectedEvent.source_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`font-semibold underline-offset-4 hover:underline ${
+                              selectedEvent.severity_level === 5 ? "text-slate-900" : "text-[var(--color-accent-soft)]"
+                            }`}
+                          >
+                            Open source article
+                          </a>
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="rounded-[1.6rem] border border-dashed border-white/12 bg-white/4 p-8">
+              <p className="text-xs uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Event detail</p>
+              <h2 className="mt-4 text-2xl font-semibold">No event selected</h2>
+              <p className="mt-3 max-w-xl text-sm leading-7 text-[var(--color-ink-soft)]">
+                Choose a marker or an event card to center the map and inspect the structured event detail.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <div className="rounded-[1.7rem] border border-white/10 bg-[rgba(13,27,42,0.94)] p-6">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Neutral intelligence</p>
+              <h2 className="mt-2 text-2xl font-semibold text-white">Recent neutral events</h2>
+            </div>
+            <span className="inline-flex items-center justify-center rounded-full border border-[var(--color-success)]/30 bg-[rgba(89,214,154,0.14)] px-3 py-1 text-xs font-semibold text-[var(--color-success)]">
+              ~
+            </span>
+          </div>
+
+          <div className="mt-5 grid gap-4">
+            {briefings.map((briefing) => (
+              <button
+                key={briefing.article_id}
+                type="button"
+                onClick={() => {
+                  setBriefingId(briefing.article_id);
+                  setSelectedId("");
+                  closeActivePopup();
+                }}
+                className={`rounded-[1.35rem] border p-5 text-left transition ${
+                  briefing.article_id === briefingId
+                    ? "border-[var(--color-success)]/60 bg-[rgba(89,214,154,0.12)]"
+                    : "border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/8"
+                }`}
+              >
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="text-lg font-semibold leading-7 text-white">{briefing.title}</h3>
+                  <span className="inline-flex items-center justify-center rounded-full border border-[var(--color-success)]/30 bg-[rgba(89,214,154,0.14)] px-3 py-1 text-xs font-semibold text-[var(--color-success)]">
+                    ~
+                  </span>
+                </div>
+                <div className="mt-4 flex flex-wrap gap-3 text-xs uppercase tracking-[0.16em] text-[var(--color-muted-ink)]">
+                  <span>{formatDate(briefing.published_at)}</span>
+                  <span>{briefing.source_name}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-6 rounded-[1.4rem] border border-dashed border-white/12 bg-white/4 p-5 text-sm leading-7 text-[var(--color-ink-soft)]">
+            These articles are not map-promoted events, but they still feed the weekly intelligence layer and broader market context.
+          </div>
+        </div>
+
         <div className="rounded-[1.7rem] border border-white/10 bg-[rgba(13,27,42,0.94)] p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
@@ -866,7 +1096,7 @@ export function MapExplorer({
                 <button
                   key={event.event_id}
                   type="button"
-                  onClick={() => selectEvent(event)}
+                  onClick={() => focusEvent(event, true)}
                   className={`rounded-[1.35rem] border p-5 text-left transition ${
                     severe
                       ? active
@@ -879,9 +1109,11 @@ export function MapExplorer({
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="space-y-2">
-                      <div className={`flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${
-                        severe ? "text-slate-500" : "text-[var(--color-muted-ink)]"
-                      }`}>
+                      <div
+                        className={`flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] ${
+                          severe ? "text-slate-500" : "text-[var(--color-muted-ink)]"
+                        }`}
+                      >
                         <span>{event.industry_slug}</span>
                         {event.event_type_slug ? <span>{event.event_type_slug}</span> : null}
                       </div>
@@ -896,9 +1128,7 @@ export function MapExplorer({
                       S{event.severity_level}
                     </span>
                   </div>
-                  <div className={`mt-4 flex flex-wrap gap-3 text-xs ${
-                    severe ? "text-slate-500" : "text-[var(--color-muted-ink)]"
-                  }`}>
+                  <div className={`mt-4 flex flex-wrap gap-3 text-xs ${severe ? "text-slate-500" : "text-[var(--color-muted-ink)]"}`}>
                     <span>{formatDate(event.event_date)}</span>
                     <span>{markerLabel(event)}</span>
                     <span>{event.source_name}</span>
@@ -909,21 +1139,6 @@ export function MapExplorer({
           </div>
         </div>
 
-        <div className="rounded-[1.7rem] border border-white/10 bg-[rgba(13,27,42,0.94)] p-6">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Next step</p>
-          <h2 className="mt-2 text-2xl font-semibold text-white">What comes after this build?</h2>
-          <div className="mt-5 space-y-4 text-sm leading-7 text-[var(--color-ink-soft)]">
-            <p>
-              The next product step is not another map rewrite. It is the intelligence layer above the map:
-              cleaner neutral-intelligence taxonomy, weekly summary generation, and editorial tooling that can turn
-              neutral headlines into a digest or future newsletter.
-            </p>
-            <p>
-              Before that, the extractor still needs selective recall tuning so real events are not trapped in
-              the neutral bucket. The current frontend now exposes both sides of that problem in one place.
-            </p>
-          </div>
-        </div>
       </section>
     </div>
   );
