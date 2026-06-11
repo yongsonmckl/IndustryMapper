@@ -77,6 +77,33 @@ export default async function Home() {
         </div>
       </section>
 
+      <section className="rounded-[1.8rem] border border-white/10 bg-[rgba(13,27,42,0.92)] p-7 shadow-[0_24px_70px_var(--color-shadow)]">
+        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="space-y-3">
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Core features</p>
+            <h2 className="text-2xl font-semibold text-white">Built for fast scanning, geographic context, and weekly review.</h2>
+            <p className="max-w-3xl text-sm leading-7 text-[var(--color-ink-soft)]">
+              Use the interactive map to inspect event severity by location, open weekly summaries by industry for a fast
+              editorial read, and keep track of both mapped events and supporting neutral coverage from current sources.
+            </p>
+          </div>
+          <div className="grid gap-3 text-sm text-[var(--color-ink-soft)] sm:grid-cols-3">
+            <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-4">
+              <p className="font-semibold text-white">Interactive maps</p>
+              <p className="mt-2 leading-7">Switch between flat and globe views, filter by industry and severity, and inspect mapped events in place.</p>
+            </div>
+            <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-4">
+              <p className="font-semibold text-white">Weekly summaries</p>
+              <p className="mt-2 leading-7">Open industry-specific weekly drafts with event highlights, watchlists, source mix, and markdown output.</p>
+            </div>
+            <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-4">
+              <p className="font-semibold text-white">Up-to-date coverage</p>
+              <p className="mt-2 leading-7">Fresh events and supporting articles are surfaced together so the map and summaries stay current.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="grid gap-8 lg:grid-cols-[1fr_1fr]">
         <div className="rounded-[1.8rem] border border-white/10 bg-[rgba(13,27,42,0.92)] p-7 shadow-[0_24px_70px_var(--color-shadow)]">
           <div className="flex items-center justify-between gap-4">
@@ -161,32 +188,6 @@ export default async function Home() {
         </div>
       </section>
 
-      <section className="rounded-[1.8rem] border border-white/10 bg-[rgba(13,27,42,0.92)] p-7 shadow-[0_24px_70px_var(--color-shadow)]">
-        <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
-          <div className="space-y-3">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Core features</p>
-            <h2 className="text-2xl font-semibold text-white">Built for fast scanning, geographic context, and weekly review.</h2>
-            <p className="max-w-3xl text-sm leading-7 text-[var(--color-ink-soft)]">
-              Use the interactive map to inspect event severity by location, open weekly summaries by industry for a fast
-              editorial read, and keep track of both mapped events and supporting neutral coverage from current sources.
-            </p>
-          </div>
-          <div className="grid gap-3 text-sm text-[var(--color-ink-soft)] sm:grid-cols-3">
-            <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-4">
-              <p className="font-semibold text-white">Interactive maps</p>
-              <p className="mt-2 leading-7">Switch between flat and globe views, filter by industry and severity, and inspect mapped events in place.</p>
-            </div>
-            <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-4">
-              <p className="font-semibold text-white">Weekly summaries</p>
-              <p className="mt-2 leading-7">Open industry-specific weekly drafts with event highlights, watchlists, source mix, and markdown output.</p>
-            </div>
-            <div className="rounded-[1.2rem] border border-white/10 bg-white/5 px-4 py-4">
-              <p className="font-semibold text-white">Up-to-date coverage</p>
-              <p className="mt-2 leading-7">Fresh events and supporting articles are surfaced together so the map and summaries stay current.</p>
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

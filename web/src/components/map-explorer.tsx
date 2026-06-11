@@ -2,7 +2,7 @@
 
 import { startTransition, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import maplibregl, { NavigationControl, type Map as MapLibreMap, type Marker } from "maplibre-gl";
+import maplibregl, { NavigationControl, type Map as MapLibreMap } from "maplibre-gl";
 import { usePathname, useRouter } from "next/navigation";
 import type { PublicBriefing } from "@/lib/briefings";
 import type { PublicEvent } from "@/lib/events";
@@ -20,6 +20,11 @@ type ViewportState = {
 };
 
 type ProjectionMode = "globe" | "map";
+type ProjectedMarker = {
+  event: PublicEvent;
+  x: number;
+  y: number;
+};
 
 type MapExplorerProps = {
   initialEvents: PublicEvent[];
@@ -167,7 +172,6 @@ export function MapExplorer({
 
   const mapContainerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
-  const markerRefs = useRef<Map<string, Marker>>(new Map());
   const activePopupRef = useRef<maplibregl.Popup | null>(null);
   const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const detailCardRef = useRef<HTMLElement | null>(null);
@@ -191,6 +195,7 @@ export function MapExplorer({
   const [projectionMode, setProjectionMode] = useState<ProjectionMode>("map");
   const [activePopupEventId, setActivePopupEventId] = useState("");
   const [zoomHintVisible, setZoomHintVisible] = useState(false);
+  const [projectedMarkers, setProjectedMarkers] = useState<ProjectedMarker[]>([]);
   const deferredViewport = useDeferredValue(settledViewport);
 
   const selectedEvent = events.find((event) => event.event_id === selectedId) ?? null;
@@ -200,6 +205,23 @@ export function MapExplorer({
   useEffect(() => {
     latestViewportRef.current = settledViewport;
   }, [settledViewport]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) {
+      setProjectedMarkers([]);
+      return;
+    }
+
+    setProjectedMarkers(
+      events.flatMap((event) => {
+        if (event.longitude == null || event.latitude == null) return [];
+        const point = map.project([event.longitude, event.latitude]);
+        const [offsetX, offsetY] = offsets.get(event.event_id) ?? [0, 0];
+        return [{ event, x: point.x + offsetX, y: point.y + offsetY }];
+      }),
+    );
+  }, [events, mapReady, offsets, viewport]);
 
   function clearZoomHint() {
     if (zoomHintTimeoutRef.current) {
@@ -216,8 +238,7 @@ export function MapExplorer({
 
   const openEventPopup = useCallback((event: PublicEvent) => {
     const map = mapRef.current;
-    const marker = markerRefs.current.get(event.event_id);
-    if (!map || !marker || event.longitude == null || event.latitude == null) return;
+    if (!map || event.longitude == null || event.latitude == null) return;
 
     closeActivePopup();
 
@@ -323,7 +344,6 @@ export function MapExplorer({
     const container = mapContainerRef.current;
     if (!container) return;
 
-    const markers = markerRefs.current;
     const initialViewport = latestViewportRef.current;
     setMapReady(false);
     const map = new maplibregl.Map({
@@ -414,8 +434,6 @@ export function MapExplorer({
       closeActivePopup();
       container.removeEventListener("wheel", wheelHandler);
       resizeObserverRef.current?.disconnect();
-      markers.forEach((marker) => marker.remove());
-      markers.clear();
       map.remove();
       mapRef.current = null;
     };
@@ -508,88 +526,6 @@ export function MapExplorer({
 
     return () => controller.abort();
   }, [industry, mapReady]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    const nextIds = new Set(events.map((event) => event.event_id));
-    markerRefs.current.forEach((marker, eventId) => {
-      if (!nextIds.has(eventId)) {
-        marker.remove();
-        markerRefs.current.delete(eventId);
-      }
-    });
-
-    for (const event of events) {
-      if (event.longitude == null || event.latitude == null) continue;
-
-      const severity = severityMeta(event.severity_level);
-      const severe = event.severity_level === 5;
-      const existing = markerRefs.current.get(event.event_id);
-      const offset = offsets.get(event.event_id) ?? [0, 0];
-
-      const button = existing?.getElement() as HTMLButtonElement | undefined ?? document.createElement("button");
-      button.type = "button";
-      button.className = "flex h-12 w-12 items-center justify-center rounded-full";
-      button.title = event.title;
-      button.onclick = () => {
-        setSelectedId(event.event_id);
-        setBriefingId("");
-        openEventPopup(event);
-        if (map && event.longitude != null && event.latitude != null) {
-          suppressPopupCloseOnMoveRef.current = true;
-          map.easeTo({
-            center: [event.longitude, event.latitude],
-            zoom: Math.max(map.getZoom(), 2.4),
-            duration: 900,
-            essential: true,
-          });
-        }
-      };
-
-      let inner = button.firstElementChild as HTMLSpanElement | null;
-      if (!inner) {
-        inner = document.createElement("span");
-        button.appendChild(inner);
-      }
-
-      inner.className = "pointer-events-none inline-flex h-11 w-11 items-center justify-center rounded-full border text-xs font-bold shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition-transform duration-150";
-      inner.textContent = event.severity_level === 5 ? "5!" : String(event.severity_level);
-      inner.style.background = severe ? "#ffffff" : severity.hex;
-      inner.style.color = severe ? "#02060b" : "#ffffff";
-      inner.style.borderColor =
-        event.event_id === selectedId || event.event_id === activePopupEventId
-          ? "#9bc6ff"
-          : severe
-            ? "#0f172a"
-            : "rgba(255,255,255,0.5)";
-      inner.style.borderWidth =
-        event.event_id === selectedId || event.event_id === activePopupEventId ? "3px" : "2px";
-      inner.style.transform = event.event_id === selectedId ? "scale(1.12)" : "scale(1)";
-
-      button.onmouseenter = () => {
-        inner!.style.transform = event.event_id === selectedId ? "scale(1.16)" : "scale(1.08)";
-      };
-      button.onmouseleave = () => {
-        inner!.style.transform = event.event_id === selectedId ? "scale(1.12)" : "scale(1)";
-      };
-
-      if (existing) {
-        existing.setLngLat([event.longitude, event.latitude]);
-        existing.setOffset(offset);
-      } else {
-        const marker = new maplibregl.Marker({
-          element: button,
-          offset,
-          anchor: "center",
-        })
-          .setLngLat([event.longitude, event.latitude])
-          .addTo(map);
-        markerRefs.current.set(event.event_id, marker);
-      }
-    }
-  }, [activePopupEventId, events, offsets, openEventPopup, selectedId]);
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-8 md:px-10 lg:px-12 lg:py-10">
@@ -747,6 +683,37 @@ export function MapExplorer({
 
         <div className="relative">
           <div ref={mapContainerRef} className="h-[64vh] min-h-[34rem] w-full overflow-hidden rounded-b-[2rem]" />
+          <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-b-[2rem]">
+            {projectedMarkers.map(({ event, x, y }) => {
+              const severity = severityMeta(event.severity_level);
+              const severe = event.severity_level === 5;
+              const active = event.event_id === selectedId || event.event_id === activePopupEventId;
+              return (
+                <button
+                  key={event.event_id}
+                  type="button"
+                  title={event.title}
+                  onClick={() => focusEvent(event, true)}
+                  className="pointer-events-auto absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full"
+                  style={{ left: `${x}px`, top: `${y}px` }}
+                >
+                  <span
+                    className={`pointer-events-none inline-flex h-11 w-11 items-center justify-center rounded-full border text-xs font-bold shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition-transform duration-150 ${
+                      event.event_id === selectedId ? "scale-[1.12]" : "scale-100"
+                    } hover:scale-[1.08]`}
+                    style={{
+                      background: severe ? "#ffffff" : severity.hex,
+                      color: severe ? "#02060b" : "#ffffff",
+                      borderColor: active ? "#9bc6ff" : severe ? "#0f172a" : "rgba(255,255,255,0.5)",
+                      borderWidth: active ? "3px" : "2px",
+                    }}
+                  >
+                    {event.severity_level === 5 ? "5!" : String(event.severity_level)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
           <div
             className={`pointer-events-none absolute inset-0 flex items-center justify-center bg-[rgba(2,6,11,0.38)] backdrop-blur-[2px] transition-opacity duration-200 ${
               zoomHintVisible ? "opacity-100" : "opacity-0"
@@ -766,6 +733,13 @@ export function MapExplorer({
             The map now supports both flat-map and globe projections. Marker clicks keep a compact popup open until
             the map moves again or the user closes it, and each popup can jump directly into the event detail card below.
           </p>
+          <details className="mt-4 rounded-[1.25rem] border border-white/10 bg-white/5 p-4">
+            <summary className="cursor-pointer list-none text-sm font-semibold text-white">How map events are pulled</summary>
+            <div className="mt-3 space-y-2 text-sm leading-7 text-[var(--color-ink-soft)]">
+              <p>Public map events are currently sourced from the `heuristic_v4` and `heuristic_v3` extraction paths.</p>
+              <p>The UI keeps that detail tucked away unless a reviewer deliberately opens it.</p>
+            </div>
+          </details>
           {loadError ? <p className="mt-3 text-sm text-[#ff958a]">{loadError}</p> : null}
         </div>
       </section>
@@ -845,7 +819,7 @@ export function MapExplorer({
           className={`rounded-[1.9rem] border p-7 shadow-[0_22px_70px_var(--color-shadow)] ${
             selectedEvent?.severity_level === 5
               ? "border-white/70 bg-white text-slate-950"
-              : "border-white/10 bg-[rgba(13,27,42,0.94)] text-white"
+              : "border-[var(--color-accent)]/30 bg-[rgba(76,143,217,0.12)] text-white"
           }`}
         >
           {selectedEvent ? (
@@ -948,76 +922,82 @@ export function MapExplorer({
                   </blockquote>
                 </div>
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div
-                    className={`rounded-[1.4rem] border p-5 ${
-                      selectedEvent.severity_level === 5 ? "border-slate-200 bg-slate-100" : "border-white/10 bg-white/5"
-                    }`}
-                  >
-                    <p
-                      className={`text-xs uppercase tracking-[0.22em] ${
-                        selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
-                      }`}
-                    >
-                      Traceability
-                    </p>
-                    <dl className="mt-4 space-y-3 text-sm">
+                <details
+                  className={`rounded-[1.4rem] border p-5 ${
+                    selectedEvent.severity_level === 5 ? "border-slate-200 bg-slate-100" : "border-white/10 bg-white/5"
+                  }`}
+                >
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-center justify-between gap-4">
                       <div>
-                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Extraction</dt>
-                        <dd className="mt-1 font-semibold">{selectedEvent.extraction_method}</dd>
+                        <p
+                          className={`text-xs uppercase tracking-[0.22em] ${
+                            selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
+                          }`}
+                        >
+                          How this event was pulled
+                        </p>
+                        <p className="mt-2 text-sm font-semibold">Press to view extraction, source, and map metadata.</p>
                       </div>
-                      <div>
-                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Source</dt>
-                        <dd className="mt-1 font-semibold">{selectedEvent.source_name}</dd>
-                      </div>
-                      <div>
-                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Dedupe key</dt>
-                        <dd className="mt-1 break-all font-semibold">{selectedEvent.dedupe_key ?? "Unavailable"}</dd>
-                      </div>
-                    </dl>
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg text-white/80">
+                        +
+                      </span>
+                    </div>
+                  </summary>
+                  <div className="mt-5 grid gap-4 md:grid-cols-2">
+                    <div>
+                      <p className={`text-xs uppercase tracking-[0.22em] ${selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}`}>
+                        Traceability
+                      </p>
+                      <dl className="mt-4 space-y-3 text-sm">
+                        <div>
+                          <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Extraction</dt>
+                          <dd className="mt-1 font-semibold">{selectedEvent.extraction_method}</dd>
+                        </div>
+                        <div>
+                          <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Source</dt>
+                          <dd className="mt-1 font-semibold">{selectedEvent.source_name}</dd>
+                        </div>
+                        <div>
+                          <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Dedupe key</dt>
+                          <dd className="mt-1 break-all font-semibold">{selectedEvent.dedupe_key ?? "Unavailable"}</dd>
+                        </div>
+                      </dl>
+                    </div>
+                    <div>
+                      <p className={`text-xs uppercase tracking-[0.22em] ${selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}`}>
+                        Map context
+                      </p>
+                      <dl className="mt-4 space-y-3 text-sm">
+                        <div>
+                          <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Coordinates</dt>
+                          <dd className="mt-1 font-semibold">
+                            {selectedEvent.latitude?.toFixed(3) ?? "?"}, {selectedEvent.longitude?.toFixed(3) ?? "?"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Role</dt>
+                          <dd className="mt-1 font-semibold">{selectedEvent.location_role ?? "unassigned"}</dd>
+                        </div>
+                        <div>
+                          <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Reference</dt>
+                          <dd className="mt-1">
+                            <a
+                              href={selectedEvent.source_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`font-semibold underline-offset-4 hover:underline ${
+                                selectedEvent.severity_level === 5 ? "text-slate-900" : "text-[var(--color-accent-soft)]"
+                              }`}
+                            >
+                              Open source article
+                            </a>
+                          </dd>
+                        </div>
+                      </dl>
+                    </div>
                   </div>
-
-                  <div
-                    className={`rounded-[1.4rem] border p-5 ${
-                      selectedEvent.severity_level === 5 ? "border-slate-200 bg-slate-100" : "border-white/10 bg-white/5"
-                    }`}
-                  >
-                    <p
-                      className={`text-xs uppercase tracking-[0.22em] ${
-                        selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"
-                      }`}
-                    >
-                      Map context
-                    </p>
-                    <dl className="mt-4 space-y-3 text-sm">
-                      <div>
-                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Coordinates</dt>
-                        <dd className="mt-1 font-semibold">
-                          {selectedEvent.latitude?.toFixed(3) ?? "?"}, {selectedEvent.longitude?.toFixed(3) ?? "?"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Role</dt>
-                        <dd className="mt-1 font-semibold">{selectedEvent.location_role ?? "unassigned"}</dd>
-                      </div>
-                      <div>
-                        <dt className={selectedEvent.severity_level === 5 ? "text-slate-500" : "text-[var(--color-muted-ink)]"}>Reference</dt>
-                        <dd className="mt-1">
-                          <a
-                            href={selectedEvent.source_url}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`font-semibold underline-offset-4 hover:underline ${
-                              selectedEvent.severity_level === 5 ? "text-slate-900" : "text-[var(--color-accent-soft)]"
-                            }`}
-                          >
-                            Open source article
-                          </a>
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-                </div>
+                </details>
               </div>
             </>
           ) : (

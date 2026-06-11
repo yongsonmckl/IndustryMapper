@@ -221,8 +221,18 @@ export default async function WeeklyPage({ searchParams }: { searchParams: Searc
                         </div>
                       </section>
 
-                      <section className="rounded-[1.35rem] border border-white/10 bg-white/5 p-5">
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Generation metadata</p>
+                      <details className="rounded-[1.35rem] border border-white/10 bg-white/5 p-5">
+                        <summary className="cursor-pointer list-none">
+                          <div className="flex items-center justify-between gap-4">
+                            <div>
+                              <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">How this summary was generated</p>
+                              <p className="mt-2 text-sm font-semibold text-white">Open to inspect `weekly_v1` and related review metadata.</p>
+                            </div>
+                            <span className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-lg text-white/80">
+                              +
+                            </span>
+                          </div>
+                        </summary>
                         <div className="mt-4 grid gap-3 text-sm">
                           <div className="flex items-center justify-between gap-4">
                             <span className="text-[var(--color-ink-soft)]">Generated</span>
@@ -237,7 +247,7 @@ export default async function WeeklyPage({ searchParams }: { searchParams: Searc
                             <span className="font-semibold text-white">{summary.review_status}</span>
                           </div>
                         </div>
-                      </section>
+                      </details>
                     </div>
                   </div>
                 </div>

@@ -187,6 +187,17 @@ def clean_excerpt(value: str | None, limit: int = 420) -> str:
     return trim_excerpt(stripped, limit)
 
 
+def clean_sentence(value: str | None, limit: int = 220) -> str:
+    cleaned = clean_excerpt(value, limit).strip()
+    cleaned = re.sub(r"\.\.\.+$", "", cleaned).strip(" ,;:-")
+    sentence_match = re.search(r"^(.+?[.!?])(?:\s|$)", cleaned)
+    if sentence_match:
+        return sentence_match.group(1).strip()
+    if not cleaned:
+        return ""
+    return f"{cleaned}."
+
+
 def normalize_text(value: str | None) -> str:
     if not value:
         return ""
@@ -452,13 +463,13 @@ def focus_phrase(terms: list[str]) -> str | None:
 
 def snippet_from_items(items: list[dict[str, Any]], date_key: str) -> str | None:
     for item in items:
-        summary = clean_excerpt(item.get("summary"), 140)
+        summary = clean_sentence(item.get("summary"), 180)
         if summary:
             return summary[0].lower() + summary[1:] if len(summary) > 1 else summary.lower()
         title = (item.get("title") or "").strip()
         if title:
             dated = format_date(item.get(date_key))
-            return f"{dated} developments around {title.lower()}"
+            return f"{dated} developments around {title.lower()}."
     return None
 
 
