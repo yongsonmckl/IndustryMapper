@@ -1,11 +1,18 @@
 import "server-only";
 
+const DEFAULT_SUPABASE_URL = "https://uwfpjwlkypryqhfmbybj.supabase.co";
+const DEFAULT_SUPABASE_PUBLISHABLE_KEY =
+  "sb_publishable_V0f2QVxSxgU9ZGb5W5xBcg_bd0VSKEK";
+
 const supabaseUrl =
-  process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  process.env.SUPABASE_URL ??
+  process.env.NEXT_PUBLIC_SUPABASE_URL ??
+  DEFAULT_SUPABASE_URL;
 const supabaseApiKey =
   process.env.SUPABASE_API_KEY ??
   process.env.SUPABASE_SERVICE_ROLE_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+  DEFAULT_SUPABASE_PUBLISHABLE_KEY;
 const supabaseIngestToken = process.env.SUPABASE_INGEST_TOKEN;
 
 function assertAdminEnv() {
