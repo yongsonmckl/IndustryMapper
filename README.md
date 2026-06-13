@@ -1,44 +1,57 @@
 # IndustryMapper
 
-IndustryMapper is a multi-industry geospatial news intelligence platform that ingests trusted news and official notices, extracts real-world events, and maps them for fast, intuitive understanding.
+IndustryMapper is a geospatial industry intelligence platform for tracking live developments across `Semiconductors` and `Oil & Gas`.
 
-## What It Does
+Version `1.0` combines a scheduled ingestion pipeline, structured event extraction, a live interactive map, and a weekly intelligence review surface in one product.
 
-IndustryMapper is designed to help users quickly understand where important industry developments are happening, what they affect, and how significant they are.
+## Version 1.0 Features
 
-The platform is built to:
+### Live Map Surface
 
-1. Ingest reputable articles and official notices
-2. Extract structured real-world events from those sources
-3. Classify events by industry, subsector, event type, severity, and geography
-4. Store those events in a geospatial database
-5. Display them on an interactive world map with filters and summaries
+- Interactive `Map` and `Globe` views powered by `MapLibre GL JS`
+- Live event markers with severity-based styling
+- Industry, event type, and severity filtering
+- Viewport-aware event loading
+- Persistent event popups with jump-to-detail flow
+- Event detail cards with linked source context
+- Neutral-intelligence sidebar for non-map-promoted but still relevant coverage
 
-## Current POC Scope
+### Weekly Intelligence
 
-The first implementation phase is intentionally narrow:
+- Dedicated `/weekly` route for review-oriented summaries
+- Per-industry collapsible weekly summary cards
+- Stored event highlights, neutral watchlists, source mix, and pattern summaries
+- Operator review states for `draft`, `reviewed`, and `published`
 
-- Industries: `Semiconductors`, `Oil & Gas`
-- Source strategy: curated public sources, RSS first
-- Output: structured events with map locations and severity signals
+### Ingestion and Enrichment
 
-Later industries can be added once the initial ingestion, schema, and frontend flow are proven.
+- Scheduled RSS-first source ingestion through `GitHub Actions`
+- Curated public-source registry
+- Article normalization and pre-insert deduplication
+- Structured event extraction with `heuristic_v4` as the main public baseline
+- Event/article traceability through `event_articles`
+- Canonical location assignment for map display
+- Retention cleanup for older articles
 
-## Product Direction
+### Product Routes
 
-IndustryMapper is intended to feel closer to an operational intelligence dashboard than a traditional news feed.
+- `/` Home
+- `/map` Live event map
+- `/weekly` Weekly intelligence review
+- `/about` Product overview
 
-Core user questions:
+## Scope
 
-- What disruptions or developments are happening right now in a given industry?
-- Where are the geographic hotspots?
-- Which companies, countries, ports, plants, or infrastructure nodes are affected?
-- How severe is the event?
-- What changed this week in a tracked sector?
+Version `1.0` is intentionally scoped to:
+
+1. `Semiconductors`
+2. `Oil & Gas`
+
+The next feature wave is planned under `.harness/Ver 1.1/`.
 
 ## Severity Model
 
-The current event severity scale is:
+IndustryMapper uses a locked `0-5` severity scale:
 
 - `0` Neutral
 - `1` Low Significance
@@ -47,62 +60,132 @@ The current event severity scale is:
 - `4` Severe
 - `5` Critical
 
-These levels map directly to frontend map styling so users can distinguish informative updates from high-risk events at a glance.
+These values drive marker styling and event emphasis throughout the app.
 
-## Planned Stack
+## Stack
 
-### Application
+### Frontend
 
 - `Next.js` App Router
 - `TypeScript`
 - `React`
 - `Tailwind CSS`
-- `shadcn/ui`
 
-### Data and infrastructure
+### Data and Backend
 
 - `Supabase Postgres`
 - `PostGIS`
-- `Vercel`
 
 ### Mapping
 
 - `MapLibre GL JS`
-- `react-map-gl/maplibre`
-- `deck.gl`
 
-### Ingestion and automation
+### Ingestion and Automation
 
 - `Python 3`
 - `GitHub Actions`
 
+### Hosting
+
+- `Vercel`
+
 ## Repository Structure
 
 ```text
-.github/workflows/     GitHub Actions workflows
-.harness/              Planning, agent guidance, and research notes
-data/sources/          Initial curated source registry
-ingestion/             Python ingestion pipeline scaffold
-supabase/migrations/   Database schema migrations
-supabase/seeds/        Reference seed data
+.github/      GitHub Actions workflows
+.harness/     Versioned planning and handoff docs
+data/         Source registry and geospatial seed data
+ingestion/    Python ingestion, enrichment, cleanup, weekly generation
+supabase/     SQL migrations and seed data
+tmp/          Local artifacts and snapshots
+web/          Next.js application
 ```
 
-## Current Status
+## Key Application Areas
 
-The repository currently includes:
+### `web/`
 
-- locked POC planning documents
-- subsector research for semiconductors and oil & gas
-- an initial public source shortlist
-- a first-pass Supabase schema
-- reference seed data for industries, subsectors, severity levels, and event types
-- a GitHub Actions-ready Python ingestion scaffold
+- `src/app/page.tsx` homepage
+- `src/app/map/page.tsx` map page shell
+- `src/app/weekly/page.tsx` weekly review surface
+- `src/app/about/page.tsx` product overview
+- `src/components/map-explorer.tsx` main interactive map client
 
-## Next Steps
+### `ingestion/`
 
-1. Create the Supabase project and apply the schema
-2. Add project secrets for GitHub Actions
-3. Expand the ingestion pipeline from feed capture into article normalization
-4. Implement AI enrichment for event extraction and classification
-5. Build the map-first frontend shell
-6. Connect frontend filters to geospatial event queries
+- `ingest_sources.py` feed ingestion
+- `enrich_events.py` article-to-event enrichment
+- `generate_weekly_summaries.py` weekly summary generation
+- `cleanup_supabase.py` retention cleanup
+
+### `supabase/`
+
+- `migrations/` schema, policies, and RPCs
+- `seeds/` reference industries, subsectors, severity levels, event types, and sources
+
+## Local Development
+
+### App
+
+From the repo root:
+
+```bash
+npm run dev
+```
+
+Or directly from the app directory:
+
+```bash
+cd web
+npm run dev
+```
+
+### Build
+
+From the repo root:
+
+```bash
+npm run build
+```
+
+### Lint
+
+From the repo root:
+
+```bash
+npm run lint
+```
+
+## Environment
+
+The web app expects Supabase environment variables for server-side reads.
+
+The ingestion pipeline expects:
+
+- `SUPABASE_URL`
+- `SUPABASE_API_KEY` or `SUPABASE_SERVICE_ROLE_KEY`
+- `SUPABASE_INGEST_TOKEN`
+
+The frontend expects:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+## Deployment
+
+The web app is deployed on `Vercel`.
+
+This repo also includes root-level Vercel build configuration so Git-triggered deployments build the actual app under `web/`.
+
+## Planning Docs
+
+Versioned planning and handoff docs live under:
+
+- `.harness/Ver 1.0/`
+- `.harness/Ver 1.1/`
+
+## Source
+
+GitHub repository:
+
+[https://github.com/yongsonmckl/IndustryMapper](https://github.com/yongsonmckl/IndustryMapper)
