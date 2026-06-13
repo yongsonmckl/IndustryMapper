@@ -255,6 +255,15 @@ class SupabaseRestClient:
         )
         raise_for_status_with_context(response)
 
+    def delete(self, path: str, params: dict[str, str]) -> None:
+        response = requests.delete(
+            f"{self.supabase_url}/rest/v1/{path}",
+            headers=self.headers,
+            params=params,
+            timeout=TIMEOUT_SECONDS,
+        )
+        raise_for_status_with_context(response)
+
 
 def fetch_reference_maps(client: SupabaseRestClient) -> dict[str, dict[str, Any]]:
     industries = client.get("industries", {"select": "id,slug"})
@@ -759,6 +768,13 @@ def fetch_existing_event_article_ids(client: SupabaseRestClient, event_id: str) 
     return {row["article_id"] for row in rows}
 
 
+def fetch_event_article_links(client: SupabaseRestClient, event_id: str) -> list[dict[str, Any]]:
+    return client.get(
+        "event_articles",
+        {"select": "id,article_id,role", "event_id": f"eq.{event_id}", "limit": "50"},
+    )
+
+
 def fetch_linked_event_for_article(client: SupabaseRestClient, article_id: str) -> dict[str, Any] | None:
     links = client.get(
         "event_articles",
@@ -771,6 +787,36 @@ def fetch_linked_event_for_article(client: SupabaseRestClient, article_id: str) 
         {"select": "id,title,confidence_score,event_fingerprint,metadata", "id": f"eq.{links[0]['event_id']}", "limit": "1"},
     )
     return rows[0] if rows else None
+
+
+def reconcile_event_after_article_downgrade(
+    client: SupabaseRestClient,
+    article_id: str,
+    linked_event: dict[str, Any] | None,
+) -> None:
+    if not linked_event:
+        return
+
+    event_id = linked_event["id"]
+    client.delete(
+        "event_articles",
+        {"event_id": f"eq.{event_id}", "article_id": f"eq.{article_id}"},
+    )
+
+    remaining_links = fetch_event_article_links(client, event_id)
+    if not remaining_links:
+        client.delete("event_locations", {"event_id": f"eq.{event_id}"})
+        client.delete("events", {"id": f"eq.{event_id}"})
+        return
+
+    if any(link.get("role") == "primary" for link in remaining_links):
+        return
+
+    client.patch(
+        "event_articles",
+        {"id": f"eq.{remaining_links[0]['id']}"},
+        {"role": "primary"},
+    )
 
 
 def is_retryable_exception(exc: Exception) -> bool:
@@ -937,6 +983,8 @@ def enrich_articles() -> dict[str, Any]:
     error_kind_counts = {"retryable": 0, "terminal": 0}
     outcome_reason_counts: dict[str, int] = {}
     status_reason_samples: dict[str, list[dict[str, Any]]] = {}
+    false_negative_review_queue: list[dict[str, Any]] = []
+    geospatial_review_queue: list[dict[str, Any]] = []
 
     for article in articles:
         source_id = article["source_id"]
@@ -946,11 +994,23 @@ def enrich_articles() -> dict[str, Any]:
         try:
             decision = extract_event_candidate(article, source_slug, centroids, location_aliases)
             if decision.article_status != "evented" or decision.candidate is None:
+                linked_event = fetch_linked_event_for_article(client, article["id"])
+                if linked_event:
+                    reconcile_event_after_article_downgrade(client, article["id"], linked_event)
                 status_reason_samples.setdefault(decision.article_status, [])
                 if len(status_reason_samples[decision.article_status]) < 8:
                     status_reason_samples[decision.article_status].append(
                         {
                             "title": article.get("title"),
+                            "reason": decision.outcome_reason,
+                            "review_notes": decision.review_notes,
+                        }
+                    )
+                if decision.article_status == "neutral_intelligence" and len(false_negative_review_queue) < 12:
+                    false_negative_review_queue.append(
+                        {
+                            "title": article.get("title"),
+                            "source_slug": source_slug,
                             "reason": decision.outcome_reason,
                             "review_notes": decision.review_notes,
                         }
@@ -1111,6 +1171,18 @@ def enrich_articles() -> dict[str, Any]:
             for location in candidate.locations:
                 precision = location.precision or "unknown"
                 location_precision_counts[precision] = location_precision_counts.get(precision, 0) + 1
+            if len(geospatial_review_queue) < 12 and (
+                not candidate.locations
+                or all((location.precision or "unknown") == "country" for location in candidate.locations)
+            ):
+                geospatial_review_queue.append(
+                    {
+                        "title": candidate.title,
+                        "source_slug": source_slug,
+                        "location_precisions": [location.precision or "unknown" for location in candidate.locations],
+                        "countries": candidate.countries,
+                    }
+                )
         except Exception as exc:
             error_kind = "retryable" if is_retryable_exception(exc) and attempts < MAX_RETRYABLE_ATTEMPTS else "terminal"
             client.patch(
@@ -1141,6 +1213,8 @@ def enrich_articles() -> dict[str, Any]:
         "error_kind_counts": error_kind_counts,
         "outcome_reason_counts": outcome_reason_counts,
         "status_reason_samples": status_reason_samples,
+        "false_negative_review_queue": false_negative_review_queue,
+        "geospatial_review_queue": geospatial_review_queue,
         "reprocess_existing": REPROCESS_EXISTING,
         "reprocess_statuses": list(REPROCESS_STATUSES),
         "enrichment_version": ENRICHMENT_VERSION,

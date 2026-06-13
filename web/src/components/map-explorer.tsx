@@ -1,9 +1,7 @@
 "use client";
 
-import { startTransition, useCallback, useDeferredValue, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useCallback, useEffect, useRef, useState } from "react";
 import maplibregl, { NavigationControl, type Map as MapLibreMap } from "maplibre-gl";
-import { usePathname, useRouter } from "next/navigation";
 import type { PublicBriefing } from "@/lib/briefings";
 import type { PublicEvent } from "@/lib/events";
 import { SEVERITY_SCALE } from "@/lib/site";
@@ -20,11 +18,6 @@ type ViewportState = {
 };
 
 type ProjectionMode = "globe" | "map";
-type ProjectedMarker = {
-  event: PublicEvent;
-  x: number;
-  y: number;
-};
 
 type MapExplorerProps = {
   initialEvents: PublicEvent[];
@@ -86,26 +79,6 @@ function summarizeBounds(map: MapLibreMap) {
   };
 }
 
-function buildSearchParams(state: {
-  industry: string;
-  eventType: string;
-  severity: string;
-  selectedId: string;
-  briefingId: string;
-  viewport: ViewportState;
-}) {
-  const params = new URLSearchParams();
-  if (state.industry) params.set("industry", state.industry);
-  if (state.eventType) params.set("eventType", state.eventType);
-  if (state.severity) params.set("severity", state.severity);
-  if (state.selectedId) params.set("selected", state.selectedId);
-  if (state.briefingId) params.set("briefing", state.briefingId);
-  params.set("centerLng", state.viewport.centerLng.toFixed(4));
-  params.set("centerLat", state.viewport.centerLat.toFixed(4));
-  params.set("zoom", state.viewport.zoom.toFixed(2));
-  return params.toString();
-}
-
 function markerOffsets(events: PublicEvent[], zoom: number) {
   const grouped = new Map<string, PublicEvent[]>();
   const precision = zoom < 2 ? 1.8 : zoom < 3 ? 0.9 : zoom < 4 ? 0.45 : 0.18;
@@ -130,6 +103,16 @@ function markerOffsets(events: PublicEvent[], zoom: number) {
     });
   }
   return offsets;
+}
+
+function projectEvents(map: MapLibreMap, events: PublicEvent[], zoom: number) {
+  const offsets = markerOffsets(events, zoom);
+  return events.flatMap((event) => {
+    if (event.longitude == null || event.latitude == null) return [];
+    const point = map.project([event.longitude, event.latitude]);
+    const [offsetX, offsetY] = offsets.get(event.event_id) ?? [0, 0];
+    return [{ event, x: point.x + offsetX, y: point.y + offsetY }];
+  });
 }
 
 function applyProjection(map: MapLibreMap, mode: ProjectionMode) {
@@ -162,8 +145,6 @@ export function MapExplorer({
   eventTypes,
   initialFilters,
 }: MapExplorerProps) {
-  const router = useRouter();
-  const pathname = usePathname();
   const initialViewportState: ViewportState = {
     centerLng: initialFilters.centerLng ?? 10,
     centerLat: initialFilters.centerLat ?? 20,
@@ -178,6 +159,9 @@ export function MapExplorer({
   const latestViewportRef = useRef(initialViewportState);
   const suppressPopupCloseOnMoveRef = useRef(false);
   const zoomHintTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const markerAnimationFrameRef = useRef<number | null>(null);
+  const eventsRef = useRef(initialEvents);
+  const markerElementRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const [industry, setIndustry] = useState(initialFilters.industry ?? "");
   const [eventType, setEventType] = useState(initialFilters.eventType ?? "");
@@ -190,38 +174,23 @@ export function MapExplorer({
   const [loadingBriefings, setLoadingBriefings] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
-  const [viewport, setViewport] = useState<ViewportState>(initialViewportState);
   const [settledViewport, setSettledViewport] = useState<ViewportState>(initialViewportState);
+  const [zoomDisplay, setZoomDisplay] = useState(Number(initialViewportState.zoom.toFixed(1)));
   const [projectionMode, setProjectionMode] = useState<ProjectionMode>("map");
   const [activePopupEventId, setActivePopupEventId] = useState("");
   const [zoomHintVisible, setZoomHintVisible] = useState(false);
-  const [projectedMarkers, setProjectedMarkers] = useState<ProjectedMarker[]>([]);
-  const deferredViewport = useDeferredValue(settledViewport);
 
   const selectedEvent = events.find((event) => event.event_id === selectedId) ?? null;
   const selectedBriefing = briefings.find((item) => item.article_id === briefingId) ?? null;
-  const offsets = markerOffsets(events, viewport.zoom);
+  const mappableEvents = events.filter((event) => event.longitude != null && event.latitude != null);
+
+  useEffect(() => {
+    eventsRef.current = events;
+  }, [events]);
 
   useEffect(() => {
     latestViewportRef.current = settledViewport;
   }, [settledViewport]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!mapReady || !map) {
-      setProjectedMarkers([]);
-      return;
-    }
-
-    setProjectedMarkers(
-      events.flatMap((event) => {
-        if (event.longitude == null || event.latitude == null) return [];
-        const point = map.project([event.longitude, event.latitude]);
-        const [offsetX, offsetY] = offsets.get(event.event_id) ?? [0, 0];
-        return [{ event, x: point.x + offsetX, y: point.y + offsetY }];
-      }),
-    );
-  }, [events, mapReady, offsets, viewport]);
 
   function clearZoomHint() {
     if (zoomHintTimeoutRef.current) {
@@ -229,6 +198,17 @@ export function MapExplorer({
       zoomHintTimeoutRef.current = null;
     }
   }
+
+  const syncProjectedMarkers = useCallback((map: MapLibreMap) => {
+    const nextZoomLabel = Number(map.getZoom().toFixed(1));
+    setZoomDisplay((current) => (current === nextZoomLabel ? current : nextZoomLabel));
+
+    for (const { event, x, y } of projectEvents(map, eventsRef.current, map.getZoom())) {
+      const marker = markerElementRefs.current.get(event.event_id);
+      if (!marker) continue;
+      marker.style.transform = `translate3d(${x}px, ${y}px, 0) translate(-50%, -50%)`;
+    }
+  }, []);
 
   const closeActivePopup = useCallback(() => {
     activePopupRef.current?.remove();
@@ -327,20 +307,6 @@ export function MapExplorer({
   }
 
   useEffect(() => {
-    const params = buildSearchParams({
-      industry,
-      eventType,
-      severity,
-      selectedId,
-      briefingId,
-      viewport: settledViewport,
-    });
-    startTransition(() => {
-      router.replace(params ? `${pathname}?${params}` : pathname, { scroll: false });
-    });
-  }, [briefingId, eventType, industry, pathname, router, selectedId, severity, settledViewport]);
-
-  useEffect(() => {
     const container = mapContainerRef.current;
     if (!container) return;
 
@@ -364,9 +330,18 @@ export function MapExplorer({
     mapRef.current = map;
     map.addControl(new NavigationControl({ showCompass: false, visualizePitch: false }), "top-right");
 
+    const scheduleProjectedMarkerSync = () => {
+      if (markerAnimationFrameRef.current != null) return;
+      markerAnimationFrameRef.current = window.requestAnimationFrame(() => {
+        markerAnimationFrameRef.current = null;
+        syncProjectedMarkers(map);
+      });
+    };
+
     map.on("load", () => {
       applyProjection(map, projectionMode);
       setMapReady(true);
+      scheduleProjectedMarkerSync();
     });
 
     map.on("movestart", () => {
@@ -375,14 +350,8 @@ export function MapExplorer({
       }
     });
 
-    map.on("move", () => {
-      const center = map.getCenter();
-      setViewport({
-        centerLng: Number(center.lng.toFixed(4)),
-        centerLat: Number(center.lat.toFixed(4)),
-        zoom: Number(map.getZoom().toFixed(2)),
-      });
-    });
+    map.on("move", scheduleProjectedMarkerSync);
+    map.on("render", scheduleProjectedMarkerSync);
 
     map.on("moveend", () => {
       const center = map.getCenter();
@@ -391,11 +360,11 @@ export function MapExplorer({
         centerLat: Number(center.lat.toFixed(4)),
         zoom: Number(map.getZoom().toFixed(2)),
       };
-      setViewport(nextViewport);
       setSettledViewport(nextViewport);
       if (suppressPopupCloseOnMoveRef.current) {
         suppressPopupCloseOnMoveRef.current = false;
       }
+      scheduleProjectedMarkerSync();
     });
 
     const wheelHandler = (event: WheelEvent) => {
@@ -426,18 +395,31 @@ export function MapExplorer({
     };
 
     container.addEventListener("wheel", wheelHandler, { passive: false });
-    resizeObserverRef.current = new ResizeObserver(() => map.resize());
+    resizeObserverRef.current = new ResizeObserver(() => {
+      map.resize();
+      scheduleProjectedMarkerSync();
+    });
     resizeObserverRef.current.observe(container);
 
     return () => {
       clearZoomHint();
       closeActivePopup();
+      if (markerAnimationFrameRef.current != null) {
+        window.cancelAnimationFrame(markerAnimationFrameRef.current);
+        markerAnimationFrameRef.current = null;
+      }
       container.removeEventListener("wheel", wheelHandler);
       resizeObserverRef.current?.disconnect();
       map.remove();
       mapRef.current = null;
     };
-  }, [closeActivePopup, projectionMode]);
+  }, [closeActivePopup, projectionMode, syncProjectedMarkers]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!mapReady || !map) return;
+    syncProjectedMarkers(map);
+  }, [events, mapReady, selectedId, activePopupEventId, syncProjectedMarkers]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -490,7 +472,7 @@ export function MapExplorer({
       });
 
     return () => controller.abort();
-  }, [activePopupEventId, closeActivePopup, deferredViewport, eventType, industry, mapReady, severity]);
+  }, [activePopupEventId, closeActivePopup, eventType, industry, mapReady, severity, settledViewport]);
 
   useEffect(() => {
     if (!mapReady) return;
@@ -647,7 +629,7 @@ export function MapExplorer({
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-white/10 bg-[rgba(13,27,42,0.94)] shadow-[0_28px_80px_var(--color-shadow)]">
+      <section className="relative z-0 rounded-[2rem] border border-white/10 bg-[rgba(13,27,42,0.94)] shadow-[0_28px_80px_var(--color-shadow)]">
         <div className="flex flex-wrap items-center justify-between gap-4 border-b border-white/10 px-6 py-4 md:px-8">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--color-muted-ink)]">Interactive map</p>
@@ -676,26 +658,33 @@ export function MapExplorer({
                 Map
               </button>
             </div>
-            <span>Zoom {viewport.zoom.toFixed(1)}x</span>
+            <span>Zoom {zoomDisplay.toFixed(1)}x</span>
             {(loadingEvents || loadingBriefings) ? <span>Refreshing...</span> : null}
           </div>
         </div>
 
-        <div className="relative">
+        <div className="relative z-0">
           <div ref={mapContainerRef} className="h-[64vh] min-h-[34rem] w-full overflow-hidden rounded-b-[2rem]" />
           <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-b-[2rem]">
-            {projectedMarkers.map(({ event, x, y }) => {
+            {mappableEvents.map((event) => {
               const severity = severityMeta(event.severity_level);
               const severe = event.severity_level === 5;
               const active = event.event_id === selectedId || event.event_id === activePopupEventId;
               return (
                 <button
                   key={event.event_id}
+                  ref={(node) => {
+                    if (node) {
+                      markerElementRefs.current.set(event.event_id, node);
+                    } else {
+                      markerElementRefs.current.delete(event.event_id);
+                    }
+                  }}
                   type="button"
                   title={event.title}
                   onClick={() => focusEvent(event, true)}
                   className="pointer-events-auto absolute flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full"
-                  style={{ left: `${x}px`, top: `${y}px` }}
+                  style={{ left: 0, top: 0, transform: "translate3d(-9999px, -9999px, 0)" }}
                 >
                   <span
                     className={`pointer-events-none inline-flex h-11 w-11 items-center justify-center rounded-full border text-xs font-bold shadow-[0_16px_36px_rgba(0,0,0,0.34)] transition-transform duration-150 ${
@@ -1063,9 +1052,9 @@ export function MapExplorer({
               <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[var(--color-muted-ink)]">Mapped event list</p>
               <h2 className="mt-2 text-2xl font-semibold text-white">{events.length ? `${events.length} events in view` : "No events in view"}</h2>
             </div>
-            <Link href="/about" className="text-sm font-semibold text-[var(--color-accent-soft)] transition hover:text-white">
+            <a href="/about" className="text-sm font-semibold text-[var(--color-accent-soft)] transition hover:text-white">
               Read about the model
-            </Link>
+            </a>
           </div>
           <div className="mt-5 grid gap-4">
             {events.map((event) => {

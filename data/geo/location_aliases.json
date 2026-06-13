@@ -261,5 +261,98 @@
     "city": "Ulsan",
     "location_role": "facility",
     "precision": "city"
+  },
+  {
+    "name": "Phoenix",
+    "aliases": ["phoenix", "north phoenix"],
+    "latitude": 33.4484,
+    "longitude": -112.074,
+    "country_iso3": "USA",
+    "admin1": "Arizona",
+    "city": "Phoenix",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Leixlip",
+    "aliases": ["leixlip"],
+    "latitude": 53.3658,
+    "longitude": -6.4956,
+    "country_iso3": "IRL",
+    "city": "Leixlip",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Magdeburg",
+    "aliases": ["magdeburg"],
+    "latitude": 52.12,
+    "longitude": 11.6276,
+    "country_iso3": "DEU",
+    "city": "Magdeburg",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Grenoble",
+    "aliases": ["grenoble"],
+    "latitude": 45.1885,
+    "longitude": 5.7245,
+    "country_iso3": "FRA",
+    "city": "Grenoble",
+    "location_role": "facility",
+    "precision": "city"
+  },
+  {
+    "name": "Panama Canal",
+    "aliases": ["panama canal"],
+    "latitude": 9.1012,
+    "longitude": -79.6992,
+    "country_iso3": "PAN",
+    "location_role": "affected_area",
+    "precision": "canal"
+  },
+  {
+    "name": "Cushing",
+    "aliases": ["cushing", "cushing oklahoma"],
+    "latitude": 35.9851,
+    "longitude": -96.7669,
+    "country_iso3": "USA",
+    "admin1": "Oklahoma",
+    "city": "Cushing",
+    "location_role": "facility",
+    "precision": "terminal"
+  },
+  {
+    "name": "Ras Laffan",
+    "aliases": ["ras laffan", "ras laffan industrial city"],
+    "latitude": 25.9208,
+    "longitude": 51.5333,
+    "country_iso3": "QAT",
+    "city": "Ras Laffan",
+    "location_role": "facility",
+    "precision": "terminal"
+  },
+  {
+    "name": "Freeport LNG",
+    "aliases": ["freeport lng", "freeport terminal"],
+    "latitude": 28.9541,
+    "longitude": -95.3597,
+    "country_iso3": "USA",
+    "admin1": "Texas",
+    "city": "Freeport",
+    "location_role": "facility",
+    "precision": "terminal"
+  },
+  {
+    "name": "Calcasieu Pass",
+    "aliases": ["calcasieu pass", "calcasieu pass lng"],
+    "latitude": 29.7686,
+    "longitude": -93.3422,
+    "country_iso3": "USA",
+    "admin1": "Louisiana",
+    "city": "Cameron",
+    "location_role": "facility",
+    "precision": "terminal"
   }
 ]

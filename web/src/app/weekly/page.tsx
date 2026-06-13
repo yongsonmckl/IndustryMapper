@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { listPublicWeeklySummaries } from "@/lib/weekly-summaries";
 import { SEVERITY_SCALE } from "@/lib/site";
+import { WeeklyReviewActions } from "@/components/weekly-review-actions";
 
 export const dynamic = "force-dynamic";
 
@@ -245,6 +246,15 @@ export default async function WeeklyPage({ searchParams }: { searchParams: Searc
                           <div className="flex items-center justify-between gap-4">
                             <span className="text-[var(--color-ink-soft)]">Review state</span>
                             <span className="font-semibold text-white">{summary.review_status}</span>
+                          </div>
+                          <div className="pt-2">
+                            <p className="text-[var(--color-ink-soft)]">Operator workflow</p>
+                            <div className="mt-3">
+                              <WeeklyReviewActions
+                                summaryId={summary.summary_id}
+                                reviewStatus={summary.review_status}
+                              />
+                            </div>
                           </div>
                         </div>
                       </details>
