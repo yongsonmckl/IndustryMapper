@@ -58,6 +58,14 @@ export default function RootLayout({
                 <a href="/map" className="transition hover:text-white">Map</a>
                 <a href="/weekly" className="transition hover:text-white">Weekly</a>
                 <a href="/about" className="transition hover:text-white">About</a>
+                <a
+                  href="https://github.com/yongsonmckl/IndustryMapper"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="transition hover:text-white"
+                >
+                  GitHub
+                </a>
               </div>
             </div>
           </footer>
