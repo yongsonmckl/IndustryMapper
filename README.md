@@ -2,9 +2,9 @@
 
 IndustryMapper is a geospatial industry intelligence platform for tracking live developments across `Semiconductors` and `Oil & Gas`.
 
-Version `1.0` combines a scheduled ingestion pipeline, structured event extraction, a live interactive map, and a weekly intelligence review surface in one product.
+The Current Version combines a scheduled ingestion pipeline, structured event extraction, a live interactive map, and a weekly intelligence review surface into one service.
 
-## Version 1.0 Features
+## Current Features
 
 ### Live Map Surface
 
@@ -42,12 +42,10 @@ Version `1.0` combines a scheduled ingestion pipeline, structured event extracti
 
 ## Scope
 
-Version `1.0` is intentionally scoped to:
+The Current Version is intentionally scoped to:
 
 1. `Semiconductors`
 2. `Oil & Gas`
-
-The next feature wave is planned under `.harness/Ver 1.1/`.
 
 ## Severity Model
 
@@ -93,7 +91,6 @@ These values drive marker styling and event emphasis throughout the app.
 
 ```text
 .github/      GitHub Actions workflows
-.harness/     Versioned planning and handoff docs
 data/         Source registry and geospatial seed data
 ingestion/    Python ingestion, enrichment, cleanup, weekly generation
 supabase/     SQL migrations and seed data
@@ -176,16 +173,3 @@ The frontend expects:
 The web app is deployed on `Vercel`.
 
 This repo also includes root-level Vercel build configuration so Git-triggered deployments build the actual app under `web/`.
-
-## Planning Docs
-
-Versioned planning and handoff docs live under:
-
-- `.harness/Ver 1.0/`
-- `.harness/Ver 1.1/`
-
-## Source
-
-GitHub repository:
-
-[https://github.com/yongsonmckl/IndustryMapper](https://github.com/yongsonmckl/IndustryMapper)
