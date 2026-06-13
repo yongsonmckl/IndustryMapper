@@ -1,0 +1,9 @@
+{
+  "name": "industrymapper-root",
+  "private": true,
+  "scripts": {
+    "build": "npm --prefix web run build",
+    "dev": "npm --prefix web run dev",
+    "lint": "npm --prefix web run lint"
+  }
+}
