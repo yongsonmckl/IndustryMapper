@@ -2,7 +2,7 @@
   "name": "industrymapper-root",
   "private": true,
   "scripts": {
-    "build": "npm --prefix web run build",
+    "build": "node scripts/vercel-build.mjs",
     "dev": "npm --prefix web run dev",
     "lint": "npm --prefix web run lint"
   }
