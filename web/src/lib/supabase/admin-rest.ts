@@ -9,8 +9,8 @@ const supabaseUrl =
   process.env.NEXT_PUBLIC_SUPABASE_URL ??
   DEFAULT_SUPABASE_URL;
 const supabaseApiKey =
-  process.env.SUPABASE_API_KEY ??
   process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  process.env.SUPABASE_API_KEY ??
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
   DEFAULT_SUPABASE_PUBLISHABLE_KEY;
 const supabaseIngestToken = process.env.SUPABASE_INGEST_TOKEN;

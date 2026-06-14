@@ -296,7 +296,7 @@ def fetch_existing_article_hashes(
 
 def upsert_to_supabase(source_results: list[dict[str, Any]], sources: list[SourceRecord]) -> dict[str, int]:
     supabase_url = os.getenv("SUPABASE_URL")
-    api_key = os.getenv("SUPABASE_API_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    api_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_API_KEY")
     ingest_token = os.getenv("SUPABASE_INGEST_TOKEN")
     if not supabase_url or not api_key:
         print("SUPABASE_URL or SUPABASE_API_KEY not set; skipping database write.")

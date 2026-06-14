@@ -101,7 +101,7 @@ def raise_for_status_with_context(response: requests.Response) -> None:
 class SupabaseRestClient:
     def __init__(self) -> None:
         supabase_url = os.getenv("SUPABASE_URL")
-        api_key = os.getenv("SUPABASE_API_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+        api_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_API_KEY")
         ingest_token = os.getenv("SUPABASE_INGEST_TOKEN")
         if not supabase_url or not api_key or not ingest_token:
             raise RuntimeError("SUPABASE_URL, SUPABASE_API_KEY, and SUPABASE_INGEST_TOKEN are required.")

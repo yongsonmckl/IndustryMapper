@@ -11,7 +11,7 @@ TIMEOUT_SECONDS = 30
 
 def main() -> None:
     supabase_url = os.getenv("SUPABASE_URL")
-    api_key = os.getenv("SUPABASE_API_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
+    api_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_API_KEY")
     ingest_token = os.getenv("SUPABASE_INGEST_TOKEN")
     retention_days = int(os.getenv("ARTICLE_RETENTION_DAYS", "14"))
 
