@@ -294,6 +294,38 @@ def fetch_existing_article_hashes(
     return existing_hashes
 
 
+def build_postgrest_in_filter(values: list[str]) -> str:
+    escaped_values = []
+    for value in values:
+        escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+        escaped_values.append(f'"{escaped}"')
+    return f"in.({','.join(escaped_values)})"
+
+
+def fetch_existing_article_urls(
+    supabase_url: str,
+    headers: dict[str, str],
+    urls: list[str],
+) -> set[str]:
+    if not urls:
+        return set()
+
+    existing_urls: set[str] = set()
+    batch_size = 25
+    for index in range(0, len(urls), batch_size):
+        batch = urls[index : index + batch_size]
+        response = requests.get(
+            f"{supabase_url}/rest/v1/articles",
+            headers=headers,
+            params={"select": "url", "url": build_postgrest_in_filter(batch)},
+            timeout=TIMEOUT_SECONDS,
+        )
+        raise_for_status_with_context(response)
+        existing_urls.update(row["url"] for row in response.json())
+
+    return existing_urls
+
+
 def upsert_to_supabase(source_results: list[dict[str, Any]], sources: list[SourceRecord]) -> dict[str, int]:
     supabase_url = os.getenv("SUPABASE_URL")
     api_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_API_KEY")
@@ -330,7 +362,14 @@ def upsert_to_supabase(source_results: list[dict[str, Any]], sources: list[Sourc
         for article in result.get("articles", [])
         if result["source_slug"] in source_id_map
     ]
+    article_urls = [
+        article["url"]
+        for result in source_results
+        for article in result.get("articles", [])
+        if result["source_slug"] in source_id_map
+    ]
     existing_hashes = fetch_existing_article_hashes(supabase_url, headers, article_hashes)
+    existing_urls = fetch_existing_article_urls(supabase_url, headers, article_urls)
     duplicates_skipped = 0
     rows_written = 0
 
@@ -341,7 +380,7 @@ def upsert_to_supabase(source_results: list[dict[str, Any]], sources: list[Sourc
 
         rows = []
         for article in articles:
-            if article["article_hash"] in existing_hashes:
+            if article["article_hash"] in existing_hashes or article["url"] in existing_urls:
                 duplicates_skipped += 1
                 continue
             rows.append(
@@ -374,6 +413,7 @@ def upsert_to_supabase(source_results: list[dict[str, Any]], sources: list[Sourc
                 timeout=TIMEOUT_SECONDS,
             )
             raise_for_status_with_context(response)
+            existing_urls.update(row["url"] for row in rows)
             rows_written += len(rows)
 
     return {
