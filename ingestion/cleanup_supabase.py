@@ -11,13 +11,13 @@ TIMEOUT_SECONDS = 30
 
 def main() -> None:
     supabase_url = os.getenv("SUPABASE_URL")
-    api_key = os.getenv("SUPABASE_API_KEY")
+    api_key = os.getenv("SUPABASE_API_KEY") or os.getenv("SUPABASE_SERVICE_ROLE_KEY")
     ingest_token = os.getenv("SUPABASE_INGEST_TOKEN")
     retention_days = int(os.getenv("ARTICLE_RETENTION_DAYS", "14"))
 
     if not supabase_url or not api_key or not ingest_token:
         raise RuntimeError(
-            "SUPABASE_URL, SUPABASE_API_KEY, and SUPABASE_INGEST_TOKEN are required.",
+            "SUPABASE_URL, SUPABASE_API_KEY or SUPABASE_SERVICE_ROLE_KEY, and SUPABASE_INGEST_TOKEN are required.",
         )
 
     response = requests.post(

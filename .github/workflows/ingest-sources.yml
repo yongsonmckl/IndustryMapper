@@ -10,6 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      SUPABASE_URL: https://uwfpjwlkypryqhfmbybj.supabase.co
+      SUPABASE_API_KEY: ${{ secrets.SUPABASE_API_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      SUPABASE_INGEST_TOKEN: ${{ secrets.SUPABASE_INGEST_TOKEN }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -20,50 +25,38 @@ jobs:
           python-version: "3.12"
 
       - name: Validate configuration
-        env:
-          SUPABASE_INGEST_TOKEN: ${{ secrets.SUPABASE_INGEST_TOKEN }}
         run: |
           if [ -z "$SUPABASE_INGEST_TOKEN" ]; then
             echo "SUPABASE_INGEST_TOKEN is missing. Add it under Settings > Secrets and variables > Actions."
             exit 1
           fi
+          if [ -z "$SUPABASE_API_KEY" ] && [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "SUPABASE_API_KEY or SUPABASE_SERVICE_ROLE_KEY is missing. Add one under Settings > Secrets and variables > Actions."
+            exit 1
+          fi
 
       - name: Install dependencies
-        run: pip install -r ingestion/requirements.txt
+        run: python -m pip install -r ingestion/requirements.txt
 
       - name: Run ingestion
-        env:
-          SUPABASE_URL: https://uwfpjwlkypryqhfmbybj.supabase.co
-          SUPABASE_API_KEY: sb_publishable_V0f2QVxSxgU9ZGb5W5xBcg_bd0VSKEK
-          SUPABASE_INGEST_TOKEN: ${{ secrets.SUPABASE_INGEST_TOKEN }}
         run: python ingestion/ingest_sources.py
 
       - name: Run event enrichment
-        env:
-          SUPABASE_URL: https://uwfpjwlkypryqhfmbybj.supabase.co
-          SUPABASE_API_KEY: sb_publishable_V0f2QVxSxgU9ZGb5W5xBcg_bd0VSKEK
-          SUPABASE_INGEST_TOKEN: ${{ secrets.SUPABASE_INGEST_TOKEN }}
         run: python ingestion/enrich_events.py
 
       - name: Run retention cleanup
         env:
-          SUPABASE_URL: https://uwfpjwlkypryqhfmbybj.supabase.co
-          SUPABASE_API_KEY: sb_publishable_V0f2QVxSxgU9ZGb5W5xBcg_bd0VSKEK
-          SUPABASE_INGEST_TOKEN: ${{ secrets.SUPABASE_INGEST_TOKEN }}
           ARTICLE_RETENTION_DAYS: "14"
         run: python ingestion/cleanup_supabase.py
 
       - name: Generate weekly summaries
-        env:
-          SUPABASE_URL: https://uwfpjwlkypryqhfmbybj.supabase.co
-          SUPABASE_API_KEY: sb_publishable_V0f2QVxSxgU9ZGb5W5xBcg_bd0VSKEK
-          SUPABASE_INGEST_TOKEN: ${{ secrets.SUPABASE_INGEST_TOKEN }}
         run: python ingestion/generate_weekly_summaries.py
 
       - name: Upload ingestion artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
+          if-no-files-found: ignore
           name: ingestion-snapshot
           path: |
             tmp/ingestion/latest_ingestion_snapshot.json
